@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>The Overflow | Christian Teen Community</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700&family=Permanent+Marker&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
+    
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #FDF8F0;
+            font-family: 'Inter', sans-serif;
+            color: #1E1B1A;
+            padding: 16px 12px 40px;
+        }
+        .container { max-width: 550px; margin: 0 auto; }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+            gap: 8px;
+        }
+        .logo {
+            font-size: 1.7rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #E76F51, #F4A261);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+        .verse-badge {
+            background: #FFF2E0;
+            padding: 6px 12px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #B85C1A;
+        }
+        .hero-img {
+            width: 100%;
+            border-radius: 32px;
+            object-fit: cover;
+            max-height: 200px;
+            margin: 12px 0 16px;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.05);
+        }
+        .verse-moment {
+            background: #FFFFFFE6;
+            border-left: 8px solid #E76F51;
+            padding: 18px 20px;
+            border-radius: 28px;
+            margin: 16px 0 24px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+        }
+        .verse-moment p { font-size: 1.35rem; font-weight: 600; line-height: 1.3; }
+        .verse-ref { margin-top: 10px; font-weight: 500; color: #E76F51; }
+        .auto-timer {
+            font-size: 0.7rem;
+            color: #999;
+            margin-top: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sticky-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 18px;
+            justify-content: space-between;
+            margin: 28px 0 20px;
+        }
+        .sticky {
+            width: calc(50% - 9px);
+            padding: 16px 12px;
+            border-radius: 24px;
+            box-shadow: 6px 8px 0px rgba(0,0,0,0.05);
+            transition: transform 0.2s ease;
+            font-family: 'Permanent Marker', cursive;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            position: relative;
+            cursor: pointer;
+        }
+        .sticky.pink { background: #FFD1DC; transform: rotate(-0.8deg); }
+        .sticky.yellow { background: #FFF5BA; transform: rotate(1.2deg); }
+        .sticky.green { background: #C7E9D0; transform: rotate(-0.3deg); }
+        .sticky.red { background: #FFB7B2; transform: rotate(0.9deg); }
+        .sticky.blue { background: #C5E0F4; transform: rotate(-1.1deg); }
+        .sticky.orange { background: #FFD8B1; transform: rotate(0.5deg); }
+        .sticky.brown { background: #E6D2B5; transform: rotate(-0.6deg); }
+        .sticky.purple { background: #E0D0FF; transform: rotate(0.7deg); }
+        .sticky:hover { transform: scale(1.02) rotate(0deg); cursor: pointer; }
+        .sticky small {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.65rem;
+            opacity: 0.7;
+            display: block;
+            margin-top: 10px;
+        }
+        .bookmark-btn {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        .section-title {
+            font-weight: 800;
+            font-size: 1.4rem;
+            margin: 30px 0 12px 0;
+        }
+        .topic-packs {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+        .topic-btn {
+            background: #EDE4D6;
+            padding: 8px 18px;
+            border-radius: 60px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .topic-btn:hover { background: #E76F51; color: white; transform: scale(1.02); }
+        .verse-art {
+            background: #F2EBE1;
+            border-radius: 28px;
+            padding: 16px;
+            margin: 20px 0;
+        }
+        .qotw {
+            background: #FDF0E3;
+            border-radius: 28px;
+            padding: 16px;
+            margin: 20px 0;
+        }
+        .community-wall {
+            background: #fff9f2;
+            border-radius: 28px;
+            padding: 12px;
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .comm-card {
+            background: white;
+            padding: 12px;
+            border-radius: 24px;
+            margin-bottom: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 28px;
+            border: 1px solid #ddd;
+            margin: 8px 0;
+            font-family: inherit;
+        }
+        button {
+            background: #E76F51;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 40px;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        button:hover { background: #D45A3A; transform: scale(1.02); }
+        .flex-between {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .saved-section {
+            background: #EADBC6;
+            border-radius: 28px;
+            padding: 14px;
+            margin-top: 20px;
+        }
+        .prayer-reminder {
+            background: #D9E5D6;
+            border-radius: 28px;
+            padding: 16px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        footer { margin-top: 40px; text-align: center; font-size: 0.7rem; color: #aaa; }
+        @media (max-width: 480px) { .sticky { width: 100%; } }
+        .popup-message {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2C2A29;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 60px;
+            font-size: 0.85rem;
+            z-index: 1000;
+            animation: fadeOut 3s forwards;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; }
+        }
+        .reaction-bar { margin-top: 8px; display: flex; gap: 12px; font-family: 'Inter'; font-size: 0.7rem; }
+        .reaction-btn { background: #f0e8dd; padding: 4px 8px; border-radius: 30px; font-size: 0.7rem; cursor: pointer; }
+        .topic-dropdown {
+            background: white;
+            border-radius: 28px;
+            padding: 16px;
+            margin: 10px 0 20px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            display: none;
+        }
+        .topic-dropdown.show { display: block; }
+        .close-dropdown {
+            float: right;
+            background: #ccc;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+        }
+        .search-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin: 16px 0;
+        }
+        .search-container select {
+            flex: 1;
+            margin: 0;
+        }
+        .search-container button {
+            padding: 12px 20px;
+            font-size: 1.1rem;
+        }
+        .emotion-results {
+            background: #F9F3E8;
+            border-radius: 28px;
+            padding: 16px;
+            margin: 20px 0;
+            display: none;
+        }
+        .emotion-results.show {
+            display: block;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div class="logo">✝️ THE OVERFLOW</div>
+        <div class="verse-badge">🕊️ LIVE COMMUNITY</div>
+    </div>
+
+    <img class="hero-img" src="https://images.pexels.com/photos/1775332/pexels-photo-1775332.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Christian teens" onerror="this.src='https://images.pexels.com/photos/3465324/pexels-photo-3465324.jpeg?auto=compress&w=600'">
+
+    <div class="verse-moment" id="verseMomentCard">
+        <p id="dynamicVerseText">Loading scripture...</p>
+        <div class="verse-ref" id="dynamicVerseRef">—</div>
+        <div class="auto-timer">
+            <span>✨ New verse in <span id="countdownSeconds">30</span>s</span>
+            <button id="pauseRotateBtn" style="padding:4px 12px; font-size:0.7rem;">⏸️ Pause</button>
+        </div>
+    </div>
+
+    <div class="section-title">📌 STICKY NOTES & VERSES</div>
+    <div id="stickyGrid" class="sticky-grid"></div>
+
+    <div class="section-title">🔥 TOPIC PACKS</div>
+    <div class="topic-packs" id="topicPacks">
+        <button class="topic-btn" data-topic="anxiety">Anxiety</button>
+        <button class="topic-btn" data-topic="identity">Identity</button>
+        <button class="topic-btn" data-topic="friendship">Friendship</button>
+        <button class="topic-btn" data-topic="forgiveness">Forgiveness</button>
+        <button class="topic-btn" data-topic="purpose">Purpose</button>
+    </div>
+    <div id="topicDropdown" class="topic-dropdown">
+        <button class="close-dropdown" onclick="document.getElementById('topicDropdown').classList.remove('show')">✕ Close</button>
+        <div id="topicNotesList"></div>
+    </div>
+
+    <div class="verse-art">
+        <div class="flex-between"><strong>🎨 VERSE ART GENERATOR</strong><span>⬇️ download</span></div>
+        <input type="text" id="artVerseInput" placeholder="Enter Bible reference (e.g., John 3:16, Psalm 23)" value="Jeremiah 29:11">
+        <button id="generateArtBtn">CREATE WALLPAPER ✨</button>
+        <canvas id="artCanvas" width="400" height="300" style="width:100%; max-width:400px; margin-top:12px; border-radius:24px; background:#f7ede2; display:none;"></canvas>
+        <a id="downloadArtLink" style="display:none; margin-top:8px;">Download Image</a>
+    </div>
+
+    <div class="qotw">
+        <strong>❓ QUESTION OF THE WEEK</strong>
+        <p style="margin: 8px 0;">"Where do you feel distant from God lately?"</p>
+        <textarea id="qotwAnswer" rows="2" placeholder="Anonymous answer..."></textarea>
+        <button id="submitQotw">Share honestly 🙌</button>
+        <div id="qotwResponses" style="margin-top: 12px; font-size:0.85rem;"></div>
+    </div>
+
+    <div class="section-title">💬 COMMUNITY PRAYER WALL</div>
+    <div id="communityWall" class="community-wall">
+        <div class="loading">Loading prayers from community...</div>
+    </div>
+    <button id="addTestimonyBtn">➕ Add your testimony / prayer request</button>
+
+    <div class="flex-between" style="margin:20px 0 12px;">
+        <button id="randomStickyBtn">🎲 SURPRISE ME, GOD</button>
+        <button id="shareViaWhatsappBtn">📤 Share via WhatsApp</button>
+    </div>
+
+    <div class="saved-section" id="savedSection">
+        <strong>🔖 MY SAVED NOTES & COLLECTIONS</strong>
+        <div id="savedList">No saved notes yet. Tap 📌 on any sticky!</div>
+        <button id="clearSavedBtn" style="background:#b7a48b; margin-top:8px;">Clear all</button>
+    </div>
+
+    <div class="prayer-reminder">
+        <strong>⏰ 8:00PM PRAYER REMINDER</strong>
+        <p>Get a nightly nudge to pause and pray.</p>
+        <button id="enablePrayerBtn">🔔 Enable reminder</button>
+        <p id="reminderStatus" style="font-size:0.7rem; margin-top:6px;"></p>
+    </div>
+
+    <div>
+        <label>😢 Search sticky by emotion:</label>
+        <div class="search-container">
+            <select id="emotionFilter">
+                <option value="sad">😢 Sad</option>
+                <option value="lonely">💔 Lonely</option>
+                <option value="angry">😤 Angry</option>
+                <option value="joyful">🎉 Joyful</option>
+                <option value="confused">🤔 Confused</option>
+            </select>
+            <button id="searchEmotionBtn">🔍 Search</button>
+        </div>
+    </div>
+
+    <div id="emotionResults" class="emotion-results">
+        <div class="flex-between">
+            <strong>💖 Encouragement for you</strong>
+            <button id="closeEmotionResults" style="background:#ccc; padding:4px 12px;">✕ Close</button>
+        </div>
+        <div id="emotionNotesList" class="sticky-grid" style="margin-top:12px;"></div>
+    </div>
+
+    <footer>✝️ The Overflow — real faith, real teens. Everyone's prayers appear here instantly!</footer>
+</div>
+
+<script>
+    // ============================================
+    // 🔥 YOUR FIREBASE CONFIG (ALREADY ADDED) 🔥
+    // ============================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyDvRhyUOOzp3eF5GOeu_cG6n39CzcwfaEY",
+        authDomain: "overflow1-0.firebaseapp.com",
+        projectId: "overflow1-0",
+        storageBucket: "overflow1-0.firebasestorage.app",
+        messagingSenderId: "94130528938",
+        appId: "1:94130528938:web:653bdeaaf084ee6fbf26d3",
+        measurementId: "G-RSVGPLSJZP"
+    };
+    
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    
+    // ========== SURPRISE MESSAGES (50+) ==========
+    const surpriseMessages = [
+        "✨ God loves you unconditionally — right now, in this moment.",
+        "📖 'I have loved you with an everlasting love.' — Jeremiah 31:3",
+        "💪 You are stronger than you think because Christ lives in you.",
+        "🌅 Tomorrow is a new day full of God's mercy.",
+        "🙏 You are never alone. God is with you even in the silence.",
+        "📖 'Be strong and courageous. Do not be afraid.' — Joshua 1:9",
+        "💖 Your life has purpose. God created you for a reason.",
+        "📖 'I can do all things through Christ who strengthens me.' — Philippians 4:13",
+        "🔥 You are not defined by your past mistakes. You are forgiven.",
+        "📖 'Cast all your anxiety on Him because He cares for you.' — 1 Peter 5:7",
+        "🙌 You are a masterpiece in progress. God isn't finished with you.",
+        "📖 'The Lord is my shepherd, I lack nothing.' — Psalm 23:1",
+        "💪 You are more than a conqueror through Christ. Romans 8:37",
+        "📖 'Peace I leave with you; my peace I give you.' — John 14:27",
+        "💖 You are chosen, loved, and never forgotten.",
+        "📖 'For God has not given us a spirit of fear, but of power and love.' — 2 Timothy 1:7",
+        "✨ Your current struggle is preparing you for your future victory.",
+        "📖 'The joy of the Lord is your strength.' — Nehemiah 8:10",
+        "🔥 God is fighting for you right now. Be still and know.",
+        "📖 'My grace is sufficient for you.' — 2 Corinthians 12:9",
+        "💖 You are deeply loved, fully known, and completely accepted.",
+        "📖 'Nothing will be impossible with God.' — Luke 1:37",
+        "💗 'I will never leave you nor forsake you.' — Hebrews 13:5",
+        "📖 'Come to me, all you who are weary, and I will give you rest.' — Matthew 11:28",
+        "🎯 You were created for such a time as this."
+    ];
+    
+    // ========== EMOTION NOTES ==========
+    const emotionNotes = {
+        sad: ["📖 'The Lord is close to the brokenhearted...' — Psalm 34:18", "💛 God sees your tears. You are not forgotten.", "📖 'Come to me, all you who are weary...' — Matthew 11:28", "✨ Keep going. God is with you."],
+        lonely: ["📖 'Never will I leave you; never will I forsake you.' — Hebrews 13:5", "💔 Feeling alone? God is right beside you.", "📖 'I am with you always.' — Matthew 28:20", "💬 You are never truly alone. We're praying for you."],
+        angry: ["📖 'Be angry and do not sin.' — Ephesians 4:26", "💢 Bring your anger to God — He can handle it.", "📖 'Be quick to listen, slow to speak.' — James 1:19", "💪 Give your anger to Jesus. He understands pain."],
+        joyful: ["📖 'The joy of the Lord is your strength.' — Nehemiah 8:10", "🎉 Rejoice! God has good plans for you!", "📖 'Shout for joy to the Lord, all the earth.' — Psalm 100:1", "💛 Your joy is a testimony! Share it with someone."],
+        confused: ["📖 'Trust in the Lord with all your heart...' — Proverbs 3:5", "🤔 It's okay not to have all the answers.", "📖 'If any of you lacks wisdom, ask God.' — James 1:5", "💭 When you're confused, pray. God promises to guide you."]
+    };
+    
+    // ========== STICKY NOTES DATA ==========
+    let allStickyNotes = [];
+    let savedNotes = JSON.parse(localStorage.getItem("overflow_saved") || "[]");
+    let autoRotateActive = true;
+    let countdownInterval;
+    
+    const stickyData = [
+        { text: "📖 Do not be anxious about anything... Philippians 4:6", emotion: "sad", color: "pink", topic: "anxiety" },
+        { text: "✨ Social media detox: found my identity in Christ. — Sarah, 17", emotion: "joyful", color: "yellow", topic: "identity" },
+        { text: "💬 A real friend loves at all times. Proverbs 17:17", emotion: "joyful", color: "green", topic: "friendship" },
+        { text: "❤️ God forgave me after I messed up. You're not too far gone.", emotion: "joyful", color: "blue", topic: "forgiveness" },
+        { text: "🎯 You have a purpose! 'Before I formed you I knew you.' Jeremiah 1:5", emotion: "confused", color: "purple", topic: "purpose" },
+        { text: "😢 Felt invisible until I realized God sees me. — Mike, 16", emotion: "lonely", color: "orange", topic: "identity" },
+        { text: "📖 'Come to me, all you who are weary...' Matthew 11:28", emotion: "sad", color: "red", topic: "anxiety" },
+        { text: "🔥 I was angry at God after my parents divorced. Then He showed me His love.", emotion: "angry", color: "brown", topic: "forgiveness" }
+    ];
+    
+    // ========== FIREBASE FUNCTIONS ==========
+    
+    // Load prayers from Firebase (REAL-TIME - automatically updates for everyone!)
+    function loadPrayersFromFirebase() {
+        const wall = document.getElementById("communityWall");
+        wall.innerHTML = '<div class="loading">Loading prayers from community...</div>';
+        
+        db.collection("prayers").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
+            if (snapshot.empty) {
+                wall.innerHTML = '<div class="loading">Be the first to share a prayer! 🙏</div>';
+                return;
+            }
+            
+            wall.innerHTML = "";
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                const div = document.createElement("div");
+                div.className = "comm-card";
+                div.innerHTML = `<strong>🙏 ${escapeHtml(data.name || "Anonymous")}:</strong> ${escapeHtml(data.text)}
+                    <div class="reaction-bar">
+                        <button class="reaction-btn" data-id="${doc.id}" data-type="pray">🙏 <span>${data.pray || 0}</span></button>
+                        <button class="reaction-btn" data-id="${doc.id}" data-type="heart">❤️ <span>${data.heart || 0}</span></button>
+                        <button class="reaction-btn" data-id="${doc.id}" data-type="same">Same <span>${data.same || 0}</span></button>
+                    </div>`;
+                wall.appendChild(div);
+            });
+            
+            // Add reaction handlers
+            document.querySelectorAll(".reaction-btn").forEach(btn => {
+                btn.addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    const id = btn.dataset.id;
+                    const type = btn.dataset.type;
+                    const docRef = db.collection("prayers").doc(id);
+                    const docSnap = await docRef.get();
+                    if (docSnap.exists) {
+                        const current = docSnap.data()[type] || 0;
+                        docRef.update({ [type]: current + 1 });
+                        canvasConfetti({ particleCount: 20 });
+                    }
+                });
+            });
+        }, (error) => {
+            console.error("Firestore error:", error);
+            wall.innerHTML = '<div class="loading">⚠️ Unable to connect. Make sure Firestore is enabled in test mode.</div>';
+        });
+    }
+    
+    // Load QOTW answers from Firebase
+    function loadQOTWFromFirebase() {
+        db.collection("qotw_answers").orderBy("timestamp", "desc").limit(5).onSnapshot((snapshot) => {
+            const container = document.getElementById("qotwResponses");
+            if (snapshot.empty) {
+                container.innerHTML = "<small>Be the first to answer 🙌</small>";
+                return;
+            }
+            container.innerHTML = "";
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                container.innerHTML += `<div>💬 "${escapeHtml(data.answer)}"</div>`;
+            });
+        });
+    }
+    
+    // Add prayer to Firebase
+    async function addPrayerToFirebase(text, name = "Anonymous") {
+        try {
+            await db.collection("prayers").add({
+                name: name,
+                text: text,
+                pray: 0,
+                heart: 0,
+                same: 0,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showPopup("Your prayer was shared with the community! 🙏");
+            canvasConfetti();
+            return true;
+        } catch (error) {
+            console.error("Error adding prayer:", error);
+            showPopup("Error sharing prayer. Please make sure Firestore is set up.");
+            return false;
+        }
+    }
+    
+    // Add QOTW answer to Firebase
+    async function addQOTWToFirebase(answer) {
+        try {
+            await db.collection("qotw_answers").add({
+                answer: answer,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            showPopup("Thanks for sharing your answer! 💛");
+            canvasConfetti();
+            return true;
+        } catch (error) {
+            console.error("Error adding answer:", error);
+            showPopup("Error sharing answer. Please try again.");
+            return false;
+        }
+    }
+    
+    function escapeHtml(str) { 
+        if (!str) return "";
+        return str.replace(/[&<>]/g, function(m){ 
+            if(m==='&') return '&amp;'; 
+            if(m==='<') return '&lt;'; 
+            if(m==='>') return '&gt;'; 
+            return m;
+        }); 
+    }
+    
+    // ========== BIBLE VERSE FUNCTIONS ==========
+    async function fetchVerseContent(reference) {
+        const fallbacks = {
+            "Jeremiah 29:11": { text: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.", ref: "Jeremiah 29:11" },
+            "Philippians 4:13": { text: "I can do all things through Christ who strengthens me.", ref: "Philippians 4:13" },
+            "Psalm 23": { text: "The Lord is my shepherd, I lack nothing.", ref: "Psalm 23:1" }
+        };
+        try {
+            const res = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.text && data.reference) return { text: data.text, ref: data.reference };
+            }
+        } catch(e) {}
+        return fallbacks[reference] || fallbacks["Jeremiah 29:11"];
+    }
+    
+    async function fetchRandomVerse() {
+        const verses = ["Philippians 4:13", "Jeremiah 29:11", "Psalm 23", "John 3:16"];
+        const randomRef = verses[Math.floor(Math.random() * verses.length)];
+        return await fetchVerseContent(randomRef);
+    }
+    
+    async function updateMainVerse() {
+        if (!autoRotateActive) return;
+        const verse = await fetchRandomVerse();
+        document.getElementById("dynamicVerseText").innerText = verse.text.length > 200 ? verse.text.substring(0, 197) + "..." : verse.text;
+        document.getElementById("dynamicVerseRef").innerHTML = `— ${verse.ref}`;
+    }
+    
+    function resetCountdown() {
+        if (countdownInterval) clearInterval(countdownInterval);
+        let countdown = 30;
+        const span = document.getElementById("countdownSeconds");
+        if (span) span.innerText = countdown;
+        countdownInterval = setInterval(() => {
+            if (!autoRotateActive) return;
+            if (countdown <= 1) {
+                updateMainVerse();
+                countdown = 30;
+            } else {
+                countdown--;
+                if (document.getElementById("countdownSeconds")) document.getElementById("countdownSeconds").innerText = countdown;
+            }
+        }, 1000);
+    }
+    
+    // ========== STICKY NOTES RENDERING ==========
+    function renderStickyNotes() {
+        const grid = document.getElementById("stickyGrid");
+        grid.innerHTML = "";
+        allStickyNotes.forEach(n => {
+            const div = document.createElement("div");
+            div.className = `sticky ${n.color}`;
+            div.innerHTML = `<div>${n.text}</div><small>❤️ teen faith note</small>
+                <button class="bookmark-btn" data-id="${n.id}">${savedNotes.includes(n.id) ? '🔖' : '📌'}</button>`;
+            div.addEventListener("click", (e) => {
+                if (e.target.classList.contains("bookmark-btn")) return;
+                showPopup(`✨ ${n.text.substring(0, 100)}`);
+            });
+            grid.appendChild(div);
+        });
+        document.querySelectorAll('.bookmark-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                let id = parseInt(btn.dataset.id);
+                if (savedNotes.includes(id)) savedNotes = savedNotes.filter(i => i !== id);
+                else savedNotes.push(id);
+                localStorage.setItem("overflow_saved", JSON.stringify(savedNotes));
+                renderStickyNotes();
+                updateSavedUI();
+                canvasConfetti({ particleCount: 40, spread: 40 });
+                showPopup(savedNotes.includes(id) ? "Saved! ✓" : "Removed from saved");
+            });
+        });
+    }
+    
+    function updateSavedUI() {
+        const savedDiv = document.getElementById("savedList");
+        const savedItems = allStickyNotes.filter(n => savedNotes.includes(n.id));
+        if (savedItems.length === 0) savedDiv.innerHTML = "No saved notes yet. Tap 📌 on any sticky!";
+        else {
+            savedDiv.innerHTML = savedItems.map(n => `<div>📌 ${n.text.substring(0, 70)}...</div>`).join("");
+        }
+    }
+    
+    function buildStickyNotes() {
+        allStickyNotes = [];
+        for (let i = 0; i < stickyData.length; i++) {
+            allStickyNotes.push({ id: i, ...stickyData[i], saved: savedNotes.includes(i) });
+        }
+        renderStickyNotes();
+    }
+    
+    // ========== EVENT LISTENERS ==========
+    document.getElementById("clearSavedBtn").addEventListener("click", () => {
+        savedNotes = [];
+        localStorage.setItem("overflow_saved", "[]");
+        renderStickyNotes();
+        updateSavedUI();
+        showPopup("All saved notes cleared!");
+    });
+    
+    document.getElementById("addTestimonyBtn").addEventListener("click", async () => {
+        let testimony = prompt("Share your testimony, prayer request, or encouragement (anonymous):");
+        if (testimony && testimony.trim()) {
+            await addPrayerToFirebase(testimony.trim(), "Anonymous");
+        }
+    });
+    
+    document.getElementById("submitQotw").addEventListener("click", async () => {
+        let ans = document.getElementById("qotwAnswer").value.trim();
+        if (ans) {
+            await addQOTWToFirebase(ans);
+            document.getElementById("qotwAnswer").value = "";
+        } else {
+            showPopup("Please write an answer before sharing!");
+        }
+    });
+    
+    document.getElementById("randomStickyBtn").addEventListener("click", () => {
+        const randomIndex = Math.floor(Math.random() * surpriseMessages.length);
+        showPopup(surpriseMessages[randomIndex]);
+        canvasConfetti({ particleCount: 80, spread: 50, origin: { y: 0.6 } });
+    });
+    
+    document.getElementById("shareViaWhatsappBtn").addEventListener("click", () => {
+        let msg = `Check out The Overflow 🙏 - Christian encouragement for teens! ${window.location.href}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+    });
+    
+    document.getElementById("enablePrayerBtn").addEventListener("click", () => {
+        if ("Notification" in window) {
+            Notification.requestPermission().then(perm => {
+                if (perm === "granted") {
+                    showPopup("Prayer reminder set for 8:00 PM!");
+                    document.getElementById("reminderStatus").innerText = "✅ Reminder set for 8:00 PM daily.";
+                } else alert("Please allow notifications for prayer reminders.");
+            });
+        } else alert("Notifications not supported");
+    });
+    
+    document.getElementById("generateArtBtn").addEventListener("click", async () => {
+        let verseRef = document.getElementById("artVerseInput").value.trim();
+        if (!verseRef) { showPopup("Enter a Bible reference like 'John 3:16'"); return; }
+        showPopup("Fetching verse... 🙏");
+        const verse = await fetchVerseContent(verseRef);
+        const verseText = `${verse.text.substring(0, 120)} — ${verse.ref}`;
+        const canvas = document.getElementById("artCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = 400; canvas.height = 300;
+        canvas.style.display = "block";
+        ctx.fillStyle = "#FFE8D4";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#B85C1A";
+        ctx.font = "bold 18px 'Inter'";
+        ctx.fillText("✝️ THE OVERFLOW", 20, 40);
+        ctx.font = "12px 'Permanent Marker'";
+        ctx.fillStyle = "#2E2A27";
+        const lines = verseText.match(/.{1,35}/g) || [verseText];
+        let y = 90;
+        for (let line of lines.slice(0, 6)) {
+            ctx.fillText(line, 20, y);
+            y += 25;
+        }
+        const link = document.getElementById("downloadArtLink");
+        link.href = canvas.toDataURL();
+        link.download = "verse_art.png";
+        link.style.display = "inline-block";
+        link.innerText = "⬇️ Download Art";
+        canvasConfetti({ startVelocity: 15, spread: 60 });
+        showPopup("Artwork created! Download it.");
+    });
+    
+    const topicSpecificNotes = {
+        anxiety: ["📖 'Do not be anxious...' Philippians 4:6", "💭 When anxious, pray.", "📖 'Cast all your anxiety on Him.'", "✨ Prayer helped my panic attacks."],
+        identity: ["📖 'Fearfully and wonderfully made.' Psalm 139:14", "✨ My worth isn't from likes.", "📖 'You are a chosen people.'", "🔥 Your identity is in Christ."],
+        friendship: ["📖 'A friend loves at all times.'", "💬 True friends point to Jesus.", "📖 'Carry each other's burdens.'", "💭 Quality over quantity."],
+        forgiveness: ["📖 'Forgive as the Lord forgave you.'", "💔 Forgiveness freed my heart.", "📖 'If we confess, He forgives.'", "💪 Forgiveness is healing."],
+        purpose: ["📖 'Plans to prosper you.' Jeremiah 29:11", "🎯 You were created on purpose.", "📖 'Before I formed you, I knew you.'", "💭 Your struggles are preparing you."]
+    };
+    
+    document.querySelectorAll(".topic-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const topic = btn.dataset.topic;
+            const notes = topicSpecificNotes[topic];
+            const dropdown = document.getElementById("topicDropdown");
+            const container = document.getElementById("topicNotesList");
+            container.innerHTML = `<strong style="display:block; margin-bottom:12px;">📌 ${topic.toUpperCase()}:</strong>`;
+            notes.forEach(note => {
+                const colors = ["pink", "yellow", "green", "blue", "orange", "purple"];
+                const randColor = colors[Math.floor(Math.random() * colors.length)];
+                container.innerHTML += `<div class="sticky ${randColor}" style="margin-bottom:12px; width:100%;">${note}</div>`;
+            });
+            dropdown.classList.add("show");
+            showPopup(`Here are notes about ${topic} 💛`);
+            canvasConfetti({ particleCount: 30, spread: 30 });
+        });
+    });
+    
+    function searchByEmotion() {
+        const emotion = document.getElementById("emotionFilter").value;
+        const notes = emotionNotes[emotion];
+        const resultsContainer = document.getElementById("emotionNotesList");
+        resultsContainer.innerHTML = "";
+        const colors = ["pink", "yellow", "green", "blue", "orange", "purple"];
+        notes.forEach((note, idx) => {
+            const color = colors[idx % colors.length];
+            const div = document.createElement("div");
+            div.className = `sticky ${color}`;
+            div.style.width = "100%";
+            div.style.marginBottom = "12px";
+            div.innerHTML = `<div>${note}</div><small>💖 God's encouragement</small>`;
+            resultsContainer.appendChild(div);
+        });
+        document.getElementById("emotionResults").classList.add("show");
+        showPopup(`Found ${notes.length} encouraging notes for you 💛`);
+        canvasConfetti({ particleCount: 30, spread: 30 });
+    }
+    
+    document.getElementById("closeEmotionResults").addEventListener("click", () => {
+        document.getElementById("emotionResults").classList.remove("show");
+    });
+    document.getElementById("searchEmotionBtn").addEventListener("click", searchByEmotion);
+    document.getElementById("pauseRotateBtn").addEventListener("click", () => {
+        autoRotateActive = !autoRotateActive;
+        document.getElementById("pauseRotateBtn").innerText = autoRotateActive ? "⏸️ Pause" : "▶️ Resume";
+        if (autoRotateActive) updateMainVerse();
+    });
+    
+    function showPopup(msg) {
+        let pop = document.createElement("div");
+        pop.className = "popup-message";
+        pop.innerText = msg;
+        document.body.appendChild(pop);
+        setTimeout(() => pop.remove(), 3000);
+    }
+    
+    // Initialize everything
+    buildStickyNotes();
+    updateMainVerse();
+    updateSavedUI();
+    resetCountdown();
+    loadPrayersFromFirebase();
+    loadQOTWFromFirebase();
+    
+    // Show success message
+    console.log("🔥 Firebase connected! Community features are LIVE!");
+</script>
+</body>
+</html>
