@@ -6,10 +6,9 @@
     <title>The Overflow | Christian Teen Community</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,600;14..32,700&family=Permanent+Marker&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1"></script>
-    
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -154,8 +153,8 @@
             border-radius: 28px;
             padding: 12px;
             margin: 20px 0;
-            max-height: 400px;
-            overflow-y: auto;
+            max-height: none;
+            overflow-y: visible;
         }
         .comm-card {
             background: white;
@@ -270,6 +269,74 @@
             padding: 20px;
             color: #999;
         }
+        .error-message {
+            background: #ffebee;
+            color: #c62828;
+            padding: 12px;
+            border-radius: 16px;
+            margin: 10px 0;
+            font-size: 0.85rem;
+            text-align: center;
+        }
+        .notification-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 28px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .notification-box button {
+            background: white;
+            color: #764ba2;
+            margin-top: 10px;
+        }
+        .streak-box {
+            background: #FFE0B5;
+            border-radius: 28px;
+            padding: 16px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .checkin-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+        .checkin-btn {
+            background: #4CAF50;
+            padding: 8px 16px;
+            font-size: 0.8rem;
+        }
+        .load-more-btn {
+            background: #CBA37F;
+            margin: 10px 0;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .load-more-btn:hover {
+            background: #B8855A;
+        }
+        .qotw-answers-container {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .qotw-answer-item {
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .show-more-qotw {
+            background: #EDE4D6;
+            color: #1E1B1A;
+            margin-top: 10px;
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
@@ -279,7 +346,22 @@
         <div class="verse-badge">🕊️ LIVE COMMUNITY</div>
     </div>
 
-    <img class="hero-img" src="https://images.pexels.com/photos/1775332/pexels-photo-1775332.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Christian teens" onerror="this.src='https://images.pexels.com/photos/3465324/pexels-photo-3465324.jpeg?auto=compress&w=600'">
+    <img class="hero-img" src="https://images.pexels.com/photos/1775332/pexels-photo-1775332.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Christian teens">
+
+    <!-- NOTIFICATION SUBSCRIPTION BOX -->
+    <div class="notification-box" id="notificationBox">
+        <strong>🔔 Get Daily Bible Verses!</strong>
+        <p>Receive encouragement every morning at 8:00 AM, plus prayer alerts and challenges!</p>
+        <button id="enableNotificationsBtn">✨ Enable Daily Notifications</button>
+        <p id="notificationStatus" style="font-size: 0.7rem; margin-top: 8px; opacity: 0.8;"></p>
+    </div>
+
+    <!-- STREAK TRACKER -->
+    <div class="streak-box" id="streakBox" style="display: none;">
+        <strong>🔥 Your Streak</strong>
+        <div id="streakDisplay" style="font-size: 2rem; margin: 8px 0;">0 days</div>
+        <small>Keep coming back daily to grow your streak!</small>
+    </div>
 
     <div class="verse-moment" id="verseMomentCard">
         <p id="dynamicVerseText">Loading scripture...</p>
@@ -294,7 +376,7 @@
     <div id="stickyGrid" class="sticky-grid"></div>
 
     <div class="section-title">🔥 TOPIC PACKS</div>
-    <div class="topic-packs" id="topicPacks">
+    <div class="topic-packs">
         <button class="topic-btn" data-topic="anxiety">Anxiety</button>
         <button class="topic-btn" data-topic="identity">Identity</button>
         <button class="topic-btn" data-topic="friendship">Friendship</button>
@@ -308,42 +390,55 @@
 
     <div class="verse-art">
         <div class="flex-between"><strong>🎨 VERSE ART GENERATOR</strong><span>⬇️ download</span></div>
-        <input type="text" id="artVerseInput" placeholder="Enter Bible reference (e.g., John 3:16, Psalm 23)" value="Jeremiah 29:11">
+        <input type="text" id="artVerseInput" placeholder="Enter Bible reference" value="Jeremiah 29:11">
         <button id="generateArtBtn">CREATE WALLPAPER ✨</button>
-        <canvas id="artCanvas" width="400" height="300" style="width:100%; max-width:400px; margin-top:12px; border-radius:24px; background:#f7ede2; display:none;"></canvas>
-        <a id="downloadArtLink" style="display:none; margin-top:8px;">Download Image</a>
+        <canvas id="artCanvas" width="400" height="300" style="display:none;"></canvas>
+        <a id="downloadArtLink" style="display:none;">Download Image</a>
+    </div>
+
+    <!-- MID-DAY CHECK-IN -->
+    <div class="prayer-reminder" id="checkinBox" style="display: none;">
+        <strong>💭 Mid-Day Check-In</strong>
+        <p>How are you doing spiritually today?</p>
+        <div class="checkin-buttons">
+            <button class="checkin-btn" data-checkin="prayed">🙏 Prayed</button>
+            <button class="checkin-btn" data-checkin="bible">📖 Read Bible</button>
+            <button class="checkin-btn" data-checkin="encouraged">💬 Encouraged Someone</button>
+        </div>
+        <div id="checkinResponse" style="font-size: 0.7rem; margin-top: 8px;"></div>
     </div>
 
     <div class="qotw">
         <strong>❓ QUESTION OF THE WEEK</strong>
-        <p style="margin: 8px 0;">"Where do you feel distant from God lately?"</p>
+        <p>"Where do you feel distant from God lately?"</p>
         <textarea id="qotwAnswer" rows="2" placeholder="Anonymous answer..."></textarea>
         <button id="submitQotw">Share honestly 🙌</button>
-        <div id="qotwResponses" style="margin-top: 12px; font-size:0.85rem;"></div>
+        <div id="qotwResponses" style="margin-top: 12px;"></div>
+        <button id="showMoreQotwBtn" class="show-more-qotw" style="display: none;">▼ Show More Answers</button>
     </div>
 
     <div class="section-title">💬 COMMUNITY PRAYER WALL</div>
     <div id="communityWall" class="community-wall">
         <div class="loading">Loading prayers from community...</div>
     </div>
-    <button id="addTestimonyBtn">➕ Add your testimony / prayer request</button>
+    <button id="loadMorePrayersBtn" class="load-more-btn" style="display: none;">▼ Load More Prayers (15 more) ▼</button>
+    <button id="addTestimonyBtn" style="margin-top: 10px;">➕ Add your testimony / prayer request</button>
 
-    <div class="flex-between" style="margin:20px 0 12px;">
+    <div class="flex-between" style="margin:20px 0;">
         <button id="randomStickyBtn">🎲 SURPRISE ME, GOD</button>
         <button id="shareViaWhatsappBtn">📤 Share via WhatsApp</button>
     </div>
 
-    <div class="saved-section" id="savedSection">
+    <div class="saved-section">
         <strong>🔖 MY SAVED NOTES & COLLECTIONS</strong>
         <div id="savedList">No saved notes yet. Tap 📌 on any sticky!</div>
-        <button id="clearSavedBtn" style="background:#b7a48b; margin-top:8px;">Clear all</button>
+        <button id="clearSavedBtn" style="background:#b7a48b;">Clear all</button>
     </div>
 
     <div class="prayer-reminder">
         <strong>⏰ 8:00PM PRAYER REMINDER</strong>
-        <p>Get a nightly nudge to pause and pray.</p>
         <button id="enablePrayerBtn">🔔 Enable reminder</button>
-        <p id="reminderStatus" style="font-size:0.7rem; margin-top:6px;"></p>
+        <p id="reminderStatus" style="font-size:0.7rem;"></p>
     </div>
 
     <div>
@@ -363,152 +458,262 @@
     <div id="emotionResults" class="emotion-results">
         <div class="flex-between">
             <strong>💖 Encouragement for you</strong>
-            <button id="closeEmotionResults" style="background:#ccc; padding:4px 12px;">✕ Close</button>
+            <button id="closeEmotionResults" style="background:#ccc;">✕ Close</button>
         </div>
-        <div id="emotionNotesList" class="sticky-grid" style="margin-top:12px;"></div>
+        <div id="emotionNotesList" class="sticky-grid"></div>
     </div>
 
-    <footer>✝️ The Overflow — real faith, real teens. Everyone's prayers appear here instantly!</footer>
+    <footer>✝️ The Overflow — real faith, real teens. Enable notifications for daily verses!</footer>
 </div>
 
 <script>
-    // ============================================
-    // 🔥 YOUR FIREBASE CONFIG (ALREADY ADDED) 🔥
-    // ============================================
+    // Firebase Config
     const firebaseConfig = {
         apiKey: "AIzaSyDvRhyUOOzp3eF5GOeu_cG6n39CzcwfaEY",
         authDomain: "overflow1-0.firebaseapp.com",
         projectId: "overflow1-0",
         storageBucket: "overflow1-0.firebasestorage.app",
         messagingSenderId: "94130528938",
-        appId: "1:94130528938:web:653bdeaaf084ee6fbf26d3",
-        measurementId: "G-RSVGPLSJZP"
+        appId: "1:94130528938:web:653bdeaaf084ee6fbf26d3"
     };
     
-    // Initialize Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
+    const messaging = firebase.messaging();
     
-    // ========== SURPRISE MESSAGES (50+) ==========
-    const surpriseMessages = [
-        "✨ God loves you unconditionally — right now, in this moment.",
-        "📖 'I have loved you with an everlasting love.' — Jeremiah 31:3",
-        "💪 You are stronger than you think because Christ lives in you.",
-        "🌅 Tomorrow is a new day full of God's mercy.",
-        "🙏 You are never alone. God is with you even in the silence.",
-        "📖 'Be strong and courageous. Do not be afraid.' — Joshua 1:9",
-        "💖 Your life has purpose. God created you for a reason.",
-        "📖 'I can do all things through Christ who strengthens me.' — Philippians 4:13",
-        "🔥 You are not defined by your past mistakes. You are forgiven.",
-        "📖 'Cast all your anxiety on Him because He cares for you.' — 1 Peter 5:7",
-        "🙌 You are a masterpiece in progress. God isn't finished with you.",
-        "📖 'The Lord is my shepherd, I lack nothing.' — Psalm 23:1",
-        "💪 You are more than a conqueror through Christ. Romans 8:37",
-        "📖 'Peace I leave with you; my peace I give you.' — John 14:27",
-        "💖 You are chosen, loved, and never forgotten.",
-        "📖 'For God has not given us a spirit of fear, but of power and love.' — 2 Timothy 1:7",
-        "✨ Your current struggle is preparing you for your future victory.",
-        "📖 'The joy of the Lord is your strength.' — Nehemiah 8:10",
-        "🔥 God is fighting for you right now. Be still and know.",
-        "📖 'My grace is sufficient for you.' — 2 Corinthians 12:9",
-        "💖 You are deeply loved, fully known, and completely accepted.",
-        "📖 'Nothing will be impossible with God.' — Luke 1:37",
-        "💗 'I will never leave you nor forsake you.' — Hebrews 13:5",
-        "📖 'Come to me, all you who are weary, and I will give you rest.' — Matthew 11:28",
-        "🎯 You were created for such a time as this."
-    ];
+    // Pagination variables for prayers
+    let allPrayers = [];
+    let displayedPrayerCount = 10;
+    let lastPrayerDoc = null;
+    let isLoadingMore = false;
+    let hasMorePrayers = true;
     
-    // ========== EMOTION NOTES ==========
-    const emotionNotes = {
-        sad: ["📖 'The Lord is close to the brokenhearted...' — Psalm 34:18", "💛 God sees your tears. You are not forgotten.", "📖 'Come to me, all you who are weary...' — Matthew 11:28", "✨ Keep going. God is with you."],
-        lonely: ["📖 'Never will I leave you; never will I forsake you.' — Hebrews 13:5", "💔 Feeling alone? God is right beside you.", "📖 'I am with you always.' — Matthew 28:20", "💬 You are never truly alone. We're praying for you."],
-        angry: ["📖 'Be angry and do not sin.' — Ephesians 4:26", "💢 Bring your anger to God — He can handle it.", "📖 'Be quick to listen, slow to speak.' — James 1:19", "💪 Give your anger to Jesus. He understands pain."],
-        joyful: ["📖 'The joy of the Lord is your strength.' — Nehemiah 8:10", "🎉 Rejoice! God has good plans for you!", "📖 'Shout for joy to the Lord, all the earth.' — Psalm 100:1", "💛 Your joy is a testimony! Share it with someone."],
-        confused: ["📖 'Trust in the Lord with all your heart...' — Proverbs 3:5", "🤔 It's okay not to have all the answers.", "📖 'If any of you lacks wisdom, ask God.' — James 1:5", "💭 When you're confused, pray. God promises to guide you."]
-    };
+    // Pagination for QOTW
+    let allQotwAnswers = [];
+    let displayedQotwCount = 5;
+    let qotwListenerUnsubscribe = null;
     
-    // ========== STICKY NOTES DATA ==========
-    let allStickyNotes = [];
-    let savedNotes = JSON.parse(localStorage.getItem("overflow_saved") || "[]");
-    let autoRotateActive = true;
-    let countdownInterval;
+    // Generate or retrieve device ID for streak tracking
+    let deviceId = localStorage.getItem("deviceId");
+    if (!deviceId) {
+        deviceId = 'device_' + Math.random().toString(36).substring(2, 15);
+        localStorage.setItem("deviceId", deviceId);
+    }
     
-    const stickyData = [
-        { text: "📖 Do not be anxious about anything... Philippians 4:6", emotion: "sad", color: "pink", topic: "anxiety" },
-        { text: "✨ Social media detox: found my identity in Christ. — Sarah, 17", emotion: "joyful", color: "yellow", topic: "identity" },
-        { text: "💬 A real friend loves at all times. Proverbs 17:17", emotion: "joyful", color: "green", topic: "friendship" },
-        { text: "❤️ God forgave me after I messed up. You're not too far gone.", emotion: "joyful", color: "blue", topic: "forgiveness" },
-        { text: "🎯 You have a purpose! 'Before I formed you I knew you.' Jeremiah 1:5", emotion: "confused", color: "purple", topic: "purpose" },
-        { text: "😢 Felt invisible until I realized God sees me. — Mike, 16", emotion: "lonely", color: "orange", topic: "identity" },
-        { text: "📖 'Come to me, all you who are weary...' Matthew 11:28", emotion: "sad", color: "red", topic: "anxiety" },
-        { text: "🔥 I was angry at God after my parents divorced. Then He showed me His love.", emotion: "angry", color: "brown", topic: "forgiveness" }
-    ];
+    // Check for existing notification subscription
+    let isSubscribed = localStorage.getItem("pushSubscribed") === "true";
     
-    // ========== FIREBASE FUNCTIONS ==========
+    // Load streak from Firestore
+    async function loadStreak() {
+        const docRef = db.collection("subscribers").doc(deviceId);
+        const doc = await docRef.get();
+        if (doc.exists) {
+            const data = doc.data();
+            const streak = data.streak || 0;
+            const lastVisit = data.lastVisit?.toDate();
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            let displayStreak = streak;
+            if (lastVisit) {
+                const lastDate = new Date(lastVisit);
+                lastDate.setHours(0, 0, 0, 0);
+                const diffDays = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
+                if (diffDays > 1) {
+                    displayStreak = 0;
+                    await docRef.update({ streak: 0 });
+                } else if (diffDays === 1) {
+                    displayStreak = streak;
+                }
+            }
+            
+            document.getElementById("streakDisplay").innerHTML = `${displayStreak} day${displayStreak !== 1 ? 's' : ''} 🔥`;
+            document.getElementById("streakBox").style.display = "block";
+            
+            await docRef.update({ lastVisit: firebase.firestore.FieldValue.serverTimestamp() });
+        }
+    }
     
-    // Load prayers from Firebase (REAL-TIME - automatically updates for everyone!)
+    // Request notification permission
+    async function subscribeToNotifications() {
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                const token = await messaging.getToken({
+                    vapidKey: 'BFqUFdfGLOyUh5LK7M_JxacLePj2dhXMMm4LTKZwY53serac7F7sY7iHClmVfYOChsxMe8orazcPLOoE2zNm3tc'
+                });
+                
+                await db.collection("subscribers").doc(deviceId).set({
+                    token: token,
+                    deviceId: deviceId,
+                    subscribedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastVisit: firebase.firestore.FieldValue.serverTimestamp(),
+                    streak: 1
+                });
+                
+                localStorage.setItem("pushSubscribed", "true");
+                isSubscribed = true;
+                document.getElementById("notificationStatus").innerHTML = "✅ Notifications enabled! You'll get daily verses at 8:00 AM!";
+                document.getElementById("notificationBox").style.background = "linear-gradient(135deg, #4CAF50 0%, #45a049 100%)";
+                loadStreak();
+                showPopup("🎉 You're subscribed! Check your notifications tomorrow at 8:00 AM!");
+                canvasConfetti();
+            } else {
+                showPopup("Please allow notifications to get daily Bible verses!");
+            }
+        } catch (error) {
+            console.error("FCM Error:", error);
+            showPopup("Error: " + error.message);
+        }
+    }
+    
+    // Mid-day check-in
+    document.querySelectorAll(".checkin-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+            const action = btn.dataset.checkin;
+            const responseDiv = document.getElementById("checkinResponse");
+            responseDiv.innerHTML = `✅ Thanks for checking in! You ${action} today. God sees your heart! ❤️`;
+            responseDiv.style.color = "#4CAF50";
+            canvasConfetti({ particleCount: 30 });
+            
+            await db.collection("checkins").add({
+                deviceId: deviceId,
+                action: action,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            setTimeout(() => {
+                document.getElementById("checkinBox").style.display = "none";
+            }, 2000);
+        });
+    });
+    
+    // Load prayers with pagination
     function loadPrayersFromFirebase() {
         const wall = document.getElementById("communityWall");
         wall.innerHTML = '<div class="loading">Loading prayers from community...</div>';
         
+        // First, get all prayers ordered by timestamp
         db.collection("prayers").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
-            if (snapshot.empty) {
-                wall.innerHTML = '<div class="loading">Be the first to share a prayer! 🙏</div>';
-                return;
-            }
-            
-            wall.innerHTML = "";
+            allPrayers = [];
             snapshot.forEach((doc) => {
-                const data = doc.data();
-                const div = document.createElement("div");
-                div.className = "comm-card";
-                div.innerHTML = `<strong>🙏 ${escapeHtml(data.name || "Anonymous")}:</strong> ${escapeHtml(data.text)}
-                    <div class="reaction-bar">
-                        <button class="reaction-btn" data-id="${doc.id}" data-type="pray">🙏 <span>${data.pray || 0}</span></button>
-                        <button class="reaction-btn" data-id="${doc.id}" data-type="heart">❤️ <span>${data.heart || 0}</span></button>
-                        <button class="reaction-btn" data-id="${doc.id}" data-type="same">Same <span>${data.same || 0}</span></button>
-                    </div>`;
-                wall.appendChild(div);
+                allPrayers.push({ id: doc.id, ...doc.data() });
             });
             
-            // Add reaction handlers
-            document.querySelectorAll(".reaction-btn").forEach(btn => {
-                btn.addEventListener("click", async (e) => {
-                    e.stopPropagation();
-                    const id = btn.dataset.id;
-                    const type = btn.dataset.type;
-                    const docRef = db.collection("prayers").doc(id);
-                    const docSnap = await docRef.get();
-                    if (docSnap.exists) {
-                        const current = docSnap.data()[type] || 0;
-                        docRef.update({ [type]: current + 1 });
-                        canvasConfetti({ particleCount: 20 });
-                    }
-                });
-            });
+            // Reset display
+            displayedPrayerCount = 10;
+            hasMorePrayers = allPrayers.length > 10;
+            renderPrayerWall();
+            
+            console.log("Total prayers loaded:", allPrayers.length);
         }, (error) => {
             console.error("Firestore error:", error);
-            wall.innerHTML = '<div class="loading">⚠️ Unable to connect. Make sure Firestore is enabled in test mode.</div>';
+            wall.innerHTML = `<div class="error-message">⚠️ Firestore error: ${error.message}</div>`;
         });
     }
     
-    // Load QOTW answers from Firebase
-    function loadQOTWFromFirebase() {
-        db.collection("qotw_answers").orderBy("timestamp", "desc").limit(5).onSnapshot((snapshot) => {
-            const container = document.getElementById("qotwResponses");
-            if (snapshot.empty) {
-                container.innerHTML = "<small>Be the first to answer 🙌</small>";
-                return;
-            }
-            container.innerHTML = "";
-            snapshot.forEach((doc) => {
-                const data = doc.data();
-                container.innerHTML += `<div>💬 "${escapeHtml(data.answer)}"</div>`;
+    function renderPrayerWall() {
+        const wall = document.getElementById("communityWall");
+        const prayersToShow = allPrayers.slice(0, displayedPrayerCount);
+        
+        if (prayersToShow.length === 0) {
+            wall.innerHTML = '<div class="loading">Be the first to share a prayer! 🙏</div>';
+            document.getElementById("loadMorePrayersBtn").style.display = "none";
+            return;
+        }
+        
+        wall.innerHTML = "";
+        prayersToShow.forEach((data) => {
+            const div = document.createElement("div");
+            div.className = "comm-card";
+            div.innerHTML = `<strong>🙏 ${escapeHtml(data.name || "Anonymous")}:</strong> ${escapeHtml(data.text)}
+                <div class="reaction-bar">
+                    <button class="reaction-btn" data-id="${data.id}" data-type="pray">🙏 <span>${data.pray || 0}</span></button>
+                    <button class="reaction-btn" data-id="${data.id}" data-type="heart">❤️ <span>${data.heart || 0}</span></button>
+                    <button class="reaction-btn" data-id="${data.id}" data-type="same">Same <span>${data.same || 0}</span></button>
+                </div>`;
+            wall.appendChild(div);
+        });
+        
+        // Show/hide load more button
+        const loadMoreBtn = document.getElementById("loadMorePrayersBtn");
+        if (hasMorePrayers && displayedPrayerCount < allPrayers.length) {
+            const remaining = allPrayers.length - displayedPrayerCount;
+            loadMoreBtn.style.display = "flex";
+            loadMoreBtn.innerHTML = `▼ Load More Prayers (${Math.min(15, remaining)} more) ▼`;
+        } else {
+            loadMoreBtn.style.display = "none";
+        }
+        
+        // Add reaction handlers
+        document.querySelectorAll(".reaction-btn").forEach(btn => {
+            btn.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                const id = btn.dataset.id;
+                const type = btn.dataset.type;
+                const docRef = db.collection("prayers").doc(id);
+                const docSnap = await docRef.get();
+                if (docSnap.exists) {
+                    const current = docSnap.data()[type] || 0;
+                    docRef.update({ [type]: current + 1 });
+                    canvasConfetti({ particleCount: 20 });
+                }
             });
         });
     }
     
-    // Add prayer to Firebase
+    function loadMorePrayers() {
+        displayedPrayerCount += 15;
+        renderPrayerWall();
+    }
+    
+    // Load QOTW with pagination
+    function loadQOTWFromFirebase() {
+        db.collection("qotw_answers").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
+            allQotwAnswers = [];
+            snapshot.forEach((doc) => {
+                allQotwAnswers.push(doc.data().answer);
+            });
+            renderQotw();
+            
+            console.log("Total QOTW answers loaded:", allQotwAnswers.length);
+        });
+    }
+    
+    function renderQotw() {
+        const container = document.getElementById("qotwResponses");
+        const showMoreBtn = document.getElementById("showMoreQotwBtn");
+        
+        if (allQotwAnswers.length === 0) {
+            container.innerHTML = "<small>Be the first to answer 🙌</small>";
+            showMoreBtn.style.display = "none";
+            return;
+        }
+        
+        const answersToShow = allQotwAnswers.slice(0, displayedQotwCount);
+        
+        container.innerHTML = `<div class="qotw-answers-container">`;
+        answersToShow.forEach((answer, idx) => {
+            container.innerHTML += `<div class="qotw-answer-item">💬 "${escapeHtml(answer)}"</div>`;
+        });
+        container.innerHTML += `</div>`;
+        
+        // Show/hide "Show More" button
+        if (allQotwAnswers.length > displayedQotwCount) {
+            const remaining = allQotwAnswers.length - displayedQotwCount;
+            showMoreBtn.style.display = "block";
+            showMoreBtn.innerHTML = `▼ Show More Answers (${remaining} more) ▼`;
+        } else {
+            showMoreBtn.style.display = "none";
+        }
+    }
+    
+    function showMoreQotw() {
+        displayedQotwCount += 10;
+        renderQotw();
+    }
+    
+    // Add prayer
     async function addPrayerToFirebase(text, name = "Anonymous") {
         try {
             await db.collection("prayers").add({
@@ -519,29 +724,28 @@
                 same: 0,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
-            showPopup("Your prayer was shared with the community! 🙏");
+            showPopup("Your prayer was shared! 🙏");
             canvasConfetti();
             return true;
         } catch (error) {
             console.error("Error adding prayer:", error);
-            showPopup("Error sharing prayer. Please make sure Firestore is set up.");
+            showPopup("Error: " + error.message);
             return false;
         }
     }
     
-    // Add QOTW answer to Firebase
     async function addQOTWToFirebase(answer) {
         try {
             await db.collection("qotw_answers").add({
                 answer: answer,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             });
-            showPopup("Thanks for sharing your answer! 💛");
+            showPopup("Thanks for sharing! 💛");
             canvasConfetti();
             return true;
         } catch (error) {
             console.error("Error adding answer:", error);
-            showPopup("Error sharing answer. Please try again.");
+            showPopup("Error: " + error.message);
             return false;
         }
     }
@@ -556,33 +760,50 @@
         }); 
     }
     
-    // ========== BIBLE VERSE FUNCTIONS ==========
-    async function fetchVerseContent(reference) {
-        const fallbacks = {
-            "Jeremiah 29:11": { text: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.", ref: "Jeremiah 29:11" },
-            "Philippians 4:13": { text: "I can do all things through Christ who strengthens me.", ref: "Philippians 4:13" },
-            "Psalm 23": { text: "The Lord is my shepherd, I lack nothing.", ref: "Psalm 23:1" }
-        };
-        try {
-            const res = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}`);
-            if (res.ok) {
-                const data = await res.json();
-                if (data.text && data.reference) return { text: data.text, ref: data.reference };
-            }
-        } catch(e) {}
-        return fallbacks[reference] || fallbacks["Jeremiah 29:11"];
-    }
+    // Surprise messages
+    const surpriseMessages = [
+        "✨ God loves you unconditionally — right now, in this moment.",
+        "📖 'I have loved you with an everlasting love.' — Jeremiah 31:3",
+        "💪 You are stronger than you think because Christ lives in you.",
+        "🙏 You are never alone. God is with you even in the silence.",
+        "📖 'I can do all things through Christ who strengthens me.' — Philippians 4:13",
+        "💖 You are chosen, loved, and never forgotten."
+    ];
+    
+    // Emotion notes
+    const emotionNotes = {
+        sad: ["📖 'The Lord is close to the brokenhearted' — Psalm 34:18", "💛 God sees your tears. You are not forgotten."],
+        lonely: ["📖 'Never will I leave you' — Hebrews 13:5", "💔 God is right beside you."],
+        angry: ["📖 'Be angry and do not sin' — Ephesians 4:26", "💢 Bring your anger to God."],
+        joyful: ["📖 'The joy of the Lord is your strength' — Nehemiah 8:10", "🎉 Rejoice! God has good plans!"],
+        confused: ["📖 'Trust in the Lord with all your heart' — Proverbs 3:5", "🤔 It's okay not to have all the answers."]
+    };
+    
+    // Sticky notes
+    let allStickyNotes = [];
+    let savedNotes = JSON.parse(localStorage.getItem("overflow_saved") || "[]");
+    let autoRotateActive = true;
+    let countdownInterval;
+    
+    const stickyData = [
+        { text: "📖 Do not be anxious about anything... Philippians 4:6", emotion: "sad", color: "pink", topic: "anxiety" },
+        { text: "✨ Social media detox: found my identity in Christ. — Sarah", emotion: "joyful", color: "yellow", topic: "identity" },
+        { text: "💬 A real friend loves at all times. Proverbs 17:17", emotion: "joyful", color: "green", topic: "friendship" },
+        { text: "❤️ God forgave me after I messed up.", emotion: "joyful", color: "blue", topic: "forgiveness" },
+        { text: "🎯 You have a purpose! Jeremiah 1:5", emotion: "confused", color: "purple", topic: "purpose" },
+        { text: "😢 Felt invisible until I realized God sees me.", emotion: "lonely", color: "orange", topic: "identity" },
+        { text: "📖 'Come to me, all you who are weary' Matthew 11:28", emotion: "sad", color: "red", topic: "anxiety" },
+        { text: "🔥 I was angry at God. Then He showed me His love.", emotion: "angry", color: "brown", topic: "forgiveness" }
+    ];
     
     async function fetchRandomVerse() {
-        const verses = ["Philippians 4:13", "Jeremiah 29:11", "Psalm 23", "John 3:16"];
-        const randomRef = verses[Math.floor(Math.random() * verses.length)];
-        return await fetchVerseContent(randomRef);
+        return { text: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.", ref: "Jeremiah 29:11" };
     }
     
     async function updateMainVerse() {
         if (!autoRotateActive) return;
         const verse = await fetchRandomVerse();
-        document.getElementById("dynamicVerseText").innerText = verse.text.length > 200 ? verse.text.substring(0, 197) + "..." : verse.text;
+        document.getElementById("dynamicVerseText").innerText = verse.text;
         document.getElementById("dynamicVerseRef").innerHTML = `— ${verse.ref}`;
     }
     
@@ -603,7 +824,6 @@
         }, 1000);
     }
     
-    // ========== STICKY NOTES RENDERING ==========
     function renderStickyNotes() {
         const grid = document.getElementById("stickyGrid");
         grid.innerHTML = "";
@@ -627,7 +847,7 @@
                 localStorage.setItem("overflow_saved", JSON.stringify(savedNotes));
                 renderStickyNotes();
                 updateSavedUI();
-                canvasConfetti({ particleCount: 40, spread: 40 });
+                canvasConfetti();
                 showPopup(savedNotes.includes(id) ? "Saved! ✓" : "Removed from saved");
             });
         });
@@ -650,7 +870,8 @@
         renderStickyNotes();
     }
     
-    // ========== EVENT LISTENERS ==========
+    // Event listeners
+    document.getElementById("enableNotificationsBtn").addEventListener("click", subscribeToNotifications);
     document.getElementById("clearSavedBtn").addEventListener("click", () => {
         savedNotes = [];
         localStorage.setItem("overflow_saved", "[]");
@@ -676,10 +897,13 @@
         }
     });
     
+    document.getElementById("loadMorePrayersBtn").addEventListener("click", loadMorePrayers);
+    document.getElementById("showMoreQotwBtn").addEventListener("click", showMoreQotw);
+    
     document.getElementById("randomStickyBtn").addEventListener("click", () => {
         const randomIndex = Math.floor(Math.random() * surpriseMessages.length);
         showPopup(surpriseMessages[randomIndex]);
-        canvasConfetti({ particleCount: 80, spread: 50, origin: { y: 0.6 } });
+        canvasConfetti({ particleCount: 80 });
     });
     
     document.getElementById("shareViaWhatsappBtn").addEventListener("click", () => {
@@ -692,7 +916,7 @@
             Notification.requestPermission().then(perm => {
                 if (perm === "granted") {
                     showPopup("Prayer reminder set for 8:00 PM!");
-                    document.getElementById("reminderStatus").innerText = "✅ Reminder set for 8:00 PM daily.";
+                    document.getElementById("reminderStatus").innerHTML = "✅ Reminder set for 8:00 PM daily.";
                 } else alert("Please allow notifications for prayer reminders.");
             });
         } else alert("Notifications not supported");
@@ -702,7 +926,7 @@
         let verseRef = document.getElementById("artVerseInput").value.trim();
         if (!verseRef) { showPopup("Enter a Bible reference like 'John 3:16'"); return; }
         showPopup("Fetching verse... 🙏");
-        const verse = await fetchVerseContent(verseRef);
+        const verse = await fetchRandomVerse();
         const verseText = `${verse.text.substring(0, 120)} — ${verse.ref}`;
         const canvas = document.getElementById("artCanvas");
         const ctx = canvas.getContext("2d");
@@ -726,7 +950,7 @@
         link.download = "verse_art.png";
         link.style.display = "inline-block";
         link.innerText = "⬇️ Download Art";
-        canvasConfetti({ startVelocity: 15, spread: 60 });
+        canvasConfetti();
         showPopup("Artwork created! Download it.");
     });
     
@@ -752,7 +976,7 @@
             });
             dropdown.classList.add("show");
             showPopup(`Here are notes about ${topic} 💛`);
-            canvasConfetti({ particleCount: 30, spread: 30 });
+            canvasConfetti({ particleCount: 30 });
         });
     });
     
@@ -773,7 +997,7 @@
         });
         document.getElementById("emotionResults").classList.add("show");
         showPopup(`Found ${notes.length} encouraging notes for you 💛`);
-        canvasConfetti({ particleCount: 30, spread: 30 });
+        canvasConfetti({ particleCount: 30 });
     }
     
     document.getElementById("closeEmotionResults").addEventListener("click", () => {
@@ -794,16 +1018,24 @@
         setTimeout(() => pop.remove(), 3000);
     }
     
-    // Initialize everything
+    // Show mid-day check-in
+    const hour = new Date().getHours();
+    if (hour >= 12 && hour <= 14 && !localStorage.getItem("checkedInToday")) {
+        setTimeout(() => {
+            document.getElementById("checkinBox").style.display = "block";
+        }, 5000);
+    }
+    
+    // Initialize
     buildStickyNotes();
     updateMainVerse();
     updateSavedUI();
     resetCountdown();
     loadPrayersFromFirebase();
     loadQOTWFromFirebase();
+    loadStreak();
     
-    // Show success message
-    console.log("🔥 Firebase connected! Community features are LIVE!");
+    console.log("🔥 Firebase FCM enabled! Community features with pagination are LIVE!");
 </script>
 </body>
 </html>
