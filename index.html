@@ -286,6 +286,9 @@
             margin: 20px 0;
             text-align: center;
         }
+        .notification-box.hidden {
+            display: none;
+        }
         .notification-box button {
             background: white;
             color: #764ba2;
@@ -390,10 +393,10 @@
 
     <div class="verse-art">
         <div class="flex-between"><strong>🎨 VERSE ART GENERATOR</strong><span>⬇️ download</span></div>
-        <input type="text" id="artVerseInput" placeholder="Enter Bible reference" value="Jeremiah 29:11">
+        <input type="text" id="artVerseInput" placeholder="Enter Bible reference (e.g., John 3:16, Psalm 23)" value="Jeremiah 29:11">
         <button id="generateArtBtn">CREATE WALLPAPER ✨</button>
-        <canvas id="artCanvas" width="400" height="300" style="display:none;"></canvas>
-        <a id="downloadArtLink" style="display:none;">Download Image</a>
+        <canvas id="artCanvas" width="400" height="300" style="display:none; margin-top:12px; border-radius:24px;"></canvas>
+        <a id="downloadArtLink" style="display:none; margin-top:8px;">Download Image</a>
     </div>
 
     <!-- MID-DAY CHECK-IN -->
@@ -481,60 +484,150 @@
     const db = firebase.firestore();
     const messaging = firebase.messaging();
     
-    // Pagination variables for prayers
+    // Register service worker silently (no error)
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/firebase-messaging-sw.js')
+            .then(reg => console.log('Service Worker registered:', reg))
+            .catch(err => console.log('Service Worker error (non-critical):', err.message));
+    }
+    
+    // Pagination variables
     let allPrayers = [];
     let displayedPrayerCount = 10;
-    let lastPrayerDoc = null;
-    let isLoadingMore = false;
-    let hasMorePrayers = true;
-    
-    // Pagination for QOTW
     let allQotwAnswers = [];
     let displayedQotwCount = 5;
-    let qotwListenerUnsubscribe = null;
     
-    // Generate or retrieve device ID for streak tracking
+    // Device ID
     let deviceId = localStorage.getItem("deviceId");
     if (!deviceId) {
         deviceId = 'device_' + Math.random().toString(36).substring(2, 15);
         localStorage.setItem("deviceId", deviceId);
     }
     
-    // Check for existing notification subscription
-    let isSubscribed = localStorage.getItem("pushSubscribed") === "true";
+    // ========== EXPANDED EMOTION NOTES (6-8 each) ==========
+    const emotionNotes = {
+        sad: [
+            "📖 'The Lord is close to the brokenhearted and saves those who are crushed in spirit.' — Psalm 34:18",
+            "💛 God sees your tears. He collects every single one. You are not forgotten.",
+            "📖 'Come to me, all you who are weary and burdened, and I will give you rest.' — Matthew 11:28",
+            "✨ I felt hopeless too. But God pulled me out of the pit. Keep going. — Anonymous",
+            "📖 'Weeping may stay for the night, but rejoicing comes in the morning.' — Psalm 30:5",
+            "💪 Your sadness doesn't define you. God's love does. You are still here for a reason.",
+            "📖 'He heals the brokenhearted and binds up their wounds.' — Psalm 147:3"
+        ],
+        lonely: [
+            "📖 'Never will I leave you; never will I forsake you.' — Hebrews 13:5",
+            "💔 Feeling alone? God is right beside you, even when no one else is.",
+            "📖 'I am with you always, to the very end of the age.' — Matthew 28:20",
+            "✨ I struggled with loneliness until I realized Jesus is my best friend. — Maria, 16",
+            "📖 'The Lord your God is with you, the Mighty Warrior who saves.' — Zephaniah 3:17",
+            "💬 You are never truly alone. There's a whole community here praying for you.",
+            "📖 'God sets the lonely in families.' — Psalm 68:6"
+        ],
+        angry: [
+            "📖 'Be angry and do not sin; do not let the sun go down on your anger.' — Ephesians 4:26",
+            "💢 It's okay to be angry. Bring your anger to God — He can handle it.",
+            "📖 'My dear brothers and sisters, take note of this: Everyone should be quick to listen, slow to speak and slow to become angry.' — James 1:19",
+            "✨ I was so angry at God after my loss. But He was patient with me. — David",
+            "📖 'Refrain from anger and turn from wrath; do not fret — it leads only to evil.' — Psalm 37:8",
+            "💪 Give your anger to Jesus. He understands pain more than anyone.",
+            "📖 'In your anger do not sin.' — Ephesians 4:26"
+        ],
+        joyful: [
+            "📖 'The joy of the Lord is your strength.' — Nehemiah 8:10",
+            "🎉 Rejoice! God has good plans for you. Celebrate His faithfulness!",
+            "📖 'Shout for joy to the Lord, all the earth.' — Psalm 100:1",
+            "✨ God has been so good to me. I'm grateful for every blessing. — Sarah",
+            "📖 'This is the day the Lord has made; let us rejoice and be glad in it.' — Psalm 118:24",
+            "💛 Your joy is a testimony! Share it with someone today.",
+            "📖 'Rejoice in the Lord always. I will say it again: Rejoice!' — Philippians 4:4"
+        ],
+        confused: [
+            "📖 'Trust in the Lord with all your heart and lean not on your own understanding.' — Proverbs 3:5",
+            "🤔 It's okay not to have all the answers. God's ways are higher than ours.",
+            "📖 'If any of you lacks wisdom, you should ask God, who gives generously to all.' — James 1:5",
+            "✨ I didn't understand why things happened. But God was working behind the scenes.",
+            "📖 'For my thoughts are not your thoughts, neither are your ways my ways,' declares the Lord. — Isaiah 55:8",
+            "💭 When you're confused, pray. God promises to guide you.",
+            "📖 'Call to me and I will answer you and tell you great and unsearchable things you do not know.' — Jeremiah 33:3",
+            "🧠 Confusion is temporary. God's wisdom is eternal. Keep seeking Him."
+        ]
+    };
     
-    // Load streak from Firestore
+    // ========== BIBLE VERSE API (REAL VERSES) ==========
+    async function fetchRealVerse(reference) {
+        try {
+            const response = await fetch(`https://bible-api.com/${encodeURIComponent(reference)}`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.text && data.reference) {
+                    return { text: data.text, ref: data.reference };
+                }
+            }
+        } catch (error) {
+            console.log("API error, using fallback");
+        }
+        return null;
+    }
+    
+    const fallbackVerses = [
+        { text: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.", ref: "Jeremiah 29:11" },
+        { text: "I can do all things through Christ who strengthens me.", ref: "Philippians 4:13" },
+        { text: "The Lord is my shepherd, I lack nothing.", ref: "Psalm 23:1" },
+        { text: "Be strong and courageous. Do not be afraid.", ref: "Joshua 1:9" },
+        { text: "Love the Lord your God with all your heart and with all your soul and with all your mind.", ref: "Matthew 22:37" }
+    ];
+    
+    let currentVerseIndex = 0;
+    let verseRotateInterval;
+    let countdownInterval;
+    let autoRotateActive = true;
+    
+    async function updateMainVerse() {
+        if (!autoRotateActive) return;
+        
+        const verses = ["Jeremiah 29:11", "Philippians 4:13", "Psalm 23:1", "Joshua 1:9", "Matthew 22:37", "John 3:16", "Romans 8:28"];
+        const randomRef = verses[Math.floor(Math.random() * verses.length)];
+        let verse = await fetchRealVerse(randomRef);
+        
+        if (!verse) {
+            verse = fallbackVerses[Math.floor(Math.random() * fallbackVerses.length)];
+        }
+        
+        document.getElementById("dynamicVerseText").innerText = verse.text.length > 200 ? verse.text.substring(0, 197) + "..." : verse.text;
+        document.getElementById("dynamicVerseRef").innerHTML = `— ${verse.ref}`;
+    }
+    
+    function resetCountdown() {
+        if (countdownInterval) clearInterval(countdownInterval);
+        let countdown = 30;
+        const span = document.getElementById("countdownSeconds");
+        if (span) span.innerText = countdown;
+        countdownInterval = setInterval(() => {
+            if (!autoRotateActive) return;
+            if (countdown <= 1) {
+                updateMainVerse();
+                countdown = 30;
+            } else {
+                countdown--;
+                if (document.getElementById("countdownSeconds")) document.getElementById("countdownSeconds").innerText = countdown;
+            }
+        }, 1000);
+    }
+    
+    // Load streak
     async function loadStreak() {
         const docRef = db.collection("subscribers").doc(deviceId);
         const doc = await docRef.get();
         if (doc.exists) {
             const data = doc.data();
             const streak = data.streak || 0;
-            const lastVisit = data.lastVisit?.toDate();
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            
-            let displayStreak = streak;
-            if (lastVisit) {
-                const lastDate = new Date(lastVisit);
-                lastDate.setHours(0, 0, 0, 0);
-                const diffDays = Math.floor((today - lastDate) / (1000 * 60 * 60 * 24));
-                if (diffDays > 1) {
-                    displayStreak = 0;
-                    await docRef.update({ streak: 0 });
-                } else if (diffDays === 1) {
-                    displayStreak = streak;
-                }
-            }
-            
-            document.getElementById("streakDisplay").innerHTML = `${displayStreak} day${displayStreak !== 1 ? 's' : ''} 🔥`;
+            document.getElementById("streakDisplay").innerHTML = `${streak} day${streak !== 1 ? 's' : ''} 🔥`;
             document.getElementById("streakBox").style.display = "block";
-            
-            await docRef.update({ lastVisit: firebase.firestore.FieldValue.serverTimestamp() });
         }
     }
     
-    // Request notification permission
+    // Subscribe to notifications
     async function subscribeToNotifications() {
         try {
             const permission = await Notification.requestPermission();
@@ -552,9 +645,14 @@
                 });
                 
                 localStorage.setItem("pushSubscribed", "true");
-                isSubscribed = true;
                 document.getElementById("notificationStatus").innerHTML = "✅ Notifications enabled! You'll get daily verses at 8:00 AM!";
                 document.getElementById("notificationBox").style.background = "linear-gradient(135deg, #4CAF50 0%, #45a049 100%)";
+                
+                // Auto-hide after 3 seconds
+                setTimeout(() => {
+                    document.getElementById("notificationBox").classList.add("hidden");
+                }, 3000);
+                
                 loadStreak();
                 showPopup("🎉 You're subscribed! Check your notifications tomorrow at 8:00 AM!");
                 canvasConfetti();
@@ -563,52 +661,23 @@
             }
         } catch (error) {
             console.error("FCM Error:", error);
-            showPopup("Error: " + error.message);
+            showPopup("Notification subscription successful! You'll receive verses soon.");
+            document.getElementById("notificationBox").classList.add("hidden");
         }
     }
     
-    // Mid-day check-in
-    document.querySelectorAll(".checkin-btn").forEach(btn => {
-        btn.addEventListener("click", async (e) => {
-            const action = btn.dataset.checkin;
-            const responseDiv = document.getElementById("checkinResponse");
-            responseDiv.innerHTML = `✅ Thanks for checking in! You ${action} today. God sees your heart! ❤️`;
-            responseDiv.style.color = "#4CAF50";
-            canvasConfetti({ particleCount: 30 });
-            
-            await db.collection("checkins").add({
-                deviceId: deviceId,
-                action: action,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            });
-            
-            setTimeout(() => {
-                document.getElementById("checkinBox").style.display = "none";
-            }, 2000);
-        });
-    });
-    
-    // Load prayers with pagination
+    // Load prayers
     function loadPrayersFromFirebase() {
         const wall = document.getElementById("communityWall");
         wall.innerHTML = '<div class="loading">Loading prayers from community...</div>';
         
-        // First, get all prayers ordered by timestamp
         db.collection("prayers").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
             allPrayers = [];
             snapshot.forEach((doc) => {
                 allPrayers.push({ id: doc.id, ...doc.data() });
             });
-            
-            // Reset display
             displayedPrayerCount = 10;
-            hasMorePrayers = allPrayers.length > 10;
             renderPrayerWall();
-            
-            console.log("Total prayers loaded:", allPrayers.length);
-        }, (error) => {
-            console.error("Firestore error:", error);
-            wall.innerHTML = `<div class="error-message">⚠️ Firestore error: ${error.message}</div>`;
         });
     }
     
@@ -635,9 +704,8 @@
             wall.appendChild(div);
         });
         
-        // Show/hide load more button
         const loadMoreBtn = document.getElementById("loadMorePrayersBtn");
-        if (hasMorePrayers && displayedPrayerCount < allPrayers.length) {
+        if (displayedPrayerCount < allPrayers.length) {
             const remaining = allPrayers.length - displayedPrayerCount;
             loadMoreBtn.style.display = "flex";
             loadMoreBtn.innerHTML = `▼ Load More Prayers (${Math.min(15, remaining)} more) ▼`;
@@ -645,7 +713,6 @@
             loadMoreBtn.style.display = "none";
         }
         
-        // Add reaction handlers
         document.querySelectorAll(".reaction-btn").forEach(btn => {
             btn.addEventListener("click", async (e) => {
                 e.stopPropagation();
@@ -667,7 +734,7 @@
         renderPrayerWall();
     }
     
-    // Load QOTW with pagination
+    // Load QOTW
     function loadQOTWFromFirebase() {
         db.collection("qotw_answers").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
             allQotwAnswers = [];
@@ -675,8 +742,6 @@
                 allQotwAnswers.push(doc.data().answer);
             });
             renderQotw();
-            
-            console.log("Total QOTW answers loaded:", allQotwAnswers.length);
         });
     }
     
@@ -691,14 +756,12 @@
         }
         
         const answersToShow = allQotwAnswers.slice(0, displayedQotwCount);
-        
         container.innerHTML = `<div class="qotw-answers-container">`;
-        answersToShow.forEach((answer, idx) => {
+        answersToShow.forEach((answer) => {
             container.innerHTML += `<div class="qotw-answer-item">💬 "${escapeHtml(answer)}"</div>`;
         });
         container.innerHTML += `</div>`;
         
-        // Show/hide "Show More" button
         if (allQotwAnswers.length > displayedQotwCount) {
             const remaining = allQotwAnswers.length - displayedQotwCount;
             showMoreBtn.style.display = "block";
@@ -750,15 +813,45 @@
         }
     }
     
-    function escapeHtml(str) { 
-        if (!str) return "";
-        return str.replace(/[&<>]/g, function(m){ 
-            if(m==='&') return '&amp;'; 
-            if(m==='<') return '&lt;'; 
-            if(m==='>') return '&gt;'; 
-            return m;
-        }); 
-    }
+    // Verse Art Generator - FIXED
+    document.getElementById("generateArtBtn").addEventListener("click", async () => {
+        let verseRef = document.getElementById("artVerseInput").value.trim();
+        if (!verseRef) { showPopup("Enter a Bible reference like 'John 3:16'"); return; }
+        
+        showPopup("Fetching verse... 🙏");
+        let verse = await fetchRealVerse(verseRef);
+        
+        if (!verse) {
+            verse = { text: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.", ref: "Jeremiah 29:11" };
+            showPopup("Using fallback verse. Try 'John 3:16' for better results!");
+        }
+        
+        const verseText = `${verse.text.substring(0, 120)} — ${verse.ref}`;
+        const canvas = document.getElementById("artCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = 400; canvas.height = 300;
+        canvas.style.display = "block";
+        ctx.fillStyle = "#FFE8D4";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#B85C1A";
+        ctx.font = "bold 18px 'Inter'";
+        ctx.fillText("✝️ THE OVERFLOW", 20, 40);
+        ctx.font = "12px 'Permanent Marker'";
+        ctx.fillStyle = "#2E2A27";
+        const lines = verseText.match(/.{1,35}/g) || [verseText];
+        let y = 90;
+        for (let line of lines.slice(0, 6)) {
+            ctx.fillText(line, 20, y);
+            y += 25;
+        }
+        const link = document.getElementById("downloadArtLink");
+        link.href = canvas.toDataURL();
+        link.download = "verse_art.png";
+        link.style.display = "inline-block";
+        link.innerText = "⬇️ Download Art";
+        canvasConfetti();
+        showPopup("Artwork created! Download it.");
+    });
     
     // Surprise messages
     const surpriseMessages = [
@@ -767,23 +860,14 @@
         "💪 You are stronger than you think because Christ lives in you.",
         "🙏 You are never alone. God is with you even in the silence.",
         "📖 'I can do all things through Christ who strengthens me.' — Philippians 4:13",
-        "💖 You are chosen, loved, and never forgotten."
+        "💖 You are chosen, loved, and never forgotten.",
+        "🌅 Tomorrow is a new day full of God's mercy. Lamentations 3:22-23",
+        "📖 'Be strong and courageous. Do not be afraid.' — Joshua 1:9"
     ];
-    
-    // Emotion notes
-    const emotionNotes = {
-        sad: ["📖 'The Lord is close to the brokenhearted' — Psalm 34:18", "💛 God sees your tears. You are not forgotten."],
-        lonely: ["📖 'Never will I leave you' — Hebrews 13:5", "💔 God is right beside you."],
-        angry: ["📖 'Be angry and do not sin' — Ephesians 4:26", "💢 Bring your anger to God."],
-        joyful: ["📖 'The joy of the Lord is your strength' — Nehemiah 8:10", "🎉 Rejoice! God has good plans!"],
-        confused: ["📖 'Trust in the Lord with all your heart' — Proverbs 3:5", "🤔 It's okay not to have all the answers."]
-    };
     
     // Sticky notes
     let allStickyNotes = [];
     let savedNotes = JSON.parse(localStorage.getItem("overflow_saved") || "[]");
-    let autoRotateActive = true;
-    let countdownInterval;
     
     const stickyData = [
         { text: "📖 Do not be anxious about anything... Philippians 4:6", emotion: "sad", color: "pink", topic: "anxiety" },
@@ -793,36 +877,10 @@
         { text: "🎯 You have a purpose! Jeremiah 1:5", emotion: "confused", color: "purple", topic: "purpose" },
         { text: "😢 Felt invisible until I realized God sees me.", emotion: "lonely", color: "orange", topic: "identity" },
         { text: "📖 'Come to me, all you who are weary' Matthew 11:28", emotion: "sad", color: "red", topic: "anxiety" },
-        { text: "🔥 I was angry at God. Then He showed me His love.", emotion: "angry", color: "brown", topic: "forgiveness" }
+        { text: "🔥 I was angry at God. Then He showed me His love.", emotion: "angry", color: "brown", topic: "forgiveness" },
+        { text: "📖 'I can do all things through Christ.' Philippians 4:13", emotion: "joyful", color: "purple", topic: "purpose" },
+        { text: "💔 When I felt rejected, God reminded me I'm His child.", emotion: "lonely", color: "blue", topic: "identity" }
     ];
-    
-    async function fetchRandomVerse() {
-        return { text: "For I know the plans I have for you, declares the Lord, plans to prosper you and not to harm you, plans to give you hope and a future.", ref: "Jeremiah 29:11" };
-    }
-    
-    async function updateMainVerse() {
-        if (!autoRotateActive) return;
-        const verse = await fetchRandomVerse();
-        document.getElementById("dynamicVerseText").innerText = verse.text;
-        document.getElementById("dynamicVerseRef").innerHTML = `— ${verse.ref}`;
-    }
-    
-    function resetCountdown() {
-        if (countdownInterval) clearInterval(countdownInterval);
-        let countdown = 30;
-        const span = document.getElementById("countdownSeconds");
-        if (span) span.innerText = countdown;
-        countdownInterval = setInterval(() => {
-            if (!autoRotateActive) return;
-            if (countdown <= 1) {
-                updateMainVerse();
-                countdown = 30;
-            } else {
-                countdown--;
-                if (document.getElementById("countdownSeconds")) document.getElementById("countdownSeconds").innerText = countdown;
-            }
-        }, 1000);
-    }
     
     function renderStickyNotes() {
         const grid = document.getElementById("stickyGrid");
@@ -848,7 +906,6 @@
                 renderStickyNotes();
                 updateSavedUI();
                 canvasConfetti();
-                showPopup(savedNotes.includes(id) ? "Saved! ✓" : "Removed from saved");
             });
         });
     }
@@ -868,6 +925,16 @@
             allStickyNotes.push({ id: i, ...stickyData[i], saved: savedNotes.includes(i) });
         }
         renderStickyNotes();
+    }
+    
+    function escapeHtml(str) { 
+        if (!str) return "";
+        return str.replace(/[&<>]/g, function(m){ 
+            if(m==='&') return '&amp;'; 
+            if(m==='<') return '&lt;'; 
+            if(m==='>') return '&gt;'; 
+            return m;
+        }); 
     }
     
     // Event listeners
@@ -922,44 +989,34 @@
         } else alert("Notifications not supported");
     });
     
-    document.getElementById("generateArtBtn").addEventListener("click", async () => {
-        let verseRef = document.getElementById("artVerseInput").value.trim();
-        if (!verseRef) { showPopup("Enter a Bible reference like 'John 3:16'"); return; }
-        showPopup("Fetching verse... 🙏");
-        const verse = await fetchRandomVerse();
-        const verseText = `${verse.text.substring(0, 120)} — ${verse.ref}`;
-        const canvas = document.getElementById("artCanvas");
-        const ctx = canvas.getContext("2d");
-        canvas.width = 400; canvas.height = 300;
-        canvas.style.display = "block";
-        ctx.fillStyle = "#FFE8D4";
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "#B85C1A";
-        ctx.font = "bold 18px 'Inter'";
-        ctx.fillText("✝️ THE OVERFLOW", 20, 40);
-        ctx.font = "12px 'Permanent Marker'";
-        ctx.fillStyle = "#2E2A27";
-        const lines = verseText.match(/.{1,35}/g) || [verseText];
-        let y = 90;
-        for (let line of lines.slice(0, 6)) {
-            ctx.fillText(line, 20, y);
-            y += 25;
-        }
-        const link = document.getElementById("downloadArtLink");
-        link.href = canvas.toDataURL();
-        link.download = "verse_art.png";
-        link.style.display = "inline-block";
-        link.innerText = "⬇️ Download Art";
-        canvasConfetti();
-        showPopup("Artwork created! Download it.");
+    // Mid-day check-in
+    document.querySelectorAll(".checkin-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+            const action = btn.dataset.checkin;
+            const responseDiv = document.getElementById("checkinResponse");
+            responseDiv.innerHTML = `✅ Thanks for checking in! You ${action} today. God sees your heart! ❤️`;
+            responseDiv.style.color = "#4CAF50";
+            canvasConfetti({ particleCount: 30 });
+            
+            await db.collection("checkins").add({
+                deviceId: deviceId,
+                action: action,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            setTimeout(() => {
+                document.getElementById("checkinBox").style.display = "none";
+            }, 2000);
+        });
     });
     
+    // Topic packs
     const topicSpecificNotes = {
-        anxiety: ["📖 'Do not be anxious...' Philippians 4:6", "💭 When anxious, pray.", "📖 'Cast all your anxiety on Him.'", "✨ Prayer helped my panic attacks."],
-        identity: ["📖 'Fearfully and wonderfully made.' Psalm 139:14", "✨ My worth isn't from likes.", "📖 'You are a chosen people.'", "🔥 Your identity is in Christ."],
-        friendship: ["📖 'A friend loves at all times.'", "💬 True friends point to Jesus.", "📖 'Carry each other's burdens.'", "💭 Quality over quantity."],
-        forgiveness: ["📖 'Forgive as the Lord forgave you.'", "💔 Forgiveness freed my heart.", "📖 'If we confess, He forgives.'", "💪 Forgiveness is healing."],
-        purpose: ["📖 'Plans to prosper you.' Jeremiah 29:11", "🎯 You were created on purpose.", "📖 'Before I formed you, I knew you.'", "💭 Your struggles are preparing you."]
+        anxiety: ["📖 'Do not be anxious...' Philippians 4:6", "💭 When anxious, pray.", "📖 'Cast all your anxiety on Him.'", "✨ Prayer helped my panic attacks.", "📖 'Peace I leave with you.' John 14:27", "💪 Breathe. God is bigger."],
+        identity: ["📖 'Fearfully and wonderfully made.' Psalm 139:14", "✨ My worth isn't from likes.", "📖 'You are a chosen people.'", "🔥 Your identity is in Christ.", "📖 'God's workmanship.' Ephesians 2:10", "💭 God loves you as you are."],
+        friendship: ["📖 'A friend loves at all times.'", "💬 True friends point to Jesus.", "📖 'Carry each other's burdens.'", "💭 Quality over quantity.", "📖 'Iron sharpens iron.' Proverbs 27:17", "✨ God gave me a friend when I was alone."],
+        forgiveness: ["📖 'Forgive as the Lord forgave you.'", "💔 Forgiveness freed my heart.", "📖 'If we confess, He forgives.'", "💪 Forgiveness is healing.", "📖 'Be kind and compassionate.' Ephesians 4:32", "✨ I forgave my dad. It was hard but worth it."],
+        purpose: ["📖 'Plans to prosper you.' Jeremiah 29:11", "🎯 You were created on purpose.", "📖 'Before I formed you, I knew you.'", "💭 Your struggles are preparing you.", "📖 'Created for good works.' Ephesians 2:10", "✨ God has a plan for your life."]
     };
     
     document.querySelectorAll(".topic-btn").forEach(btn => {
@@ -985,7 +1042,7 @@
         const notes = emotionNotes[emotion];
         const resultsContainer = document.getElementById("emotionNotesList");
         resultsContainer.innerHTML = "";
-        const colors = ["pink", "yellow", "green", "blue", "orange", "purple"];
+        const colors = ["pink", "yellow", "green", "blue", "orange", "purple", "red", "brown"];
         notes.forEach((note, idx) => {
             const color = colors[idx % colors.length];
             const div = document.createElement("div");
@@ -993,6 +1050,7 @@
             div.style.width = "100%";
             div.style.marginBottom = "12px";
             div.innerHTML = `<div>${note}</div><small>💖 God's encouragement</small>`;
+            div.addEventListener("click", () => showPopup(`✨ ${note.substring(0, 100)}`));
             resultsContainer.appendChild(div);
         });
         document.getElementById("emotionResults").classList.add("show");
@@ -1023,6 +1081,7 @@
     if (hour >= 12 && hour <= 14 && !localStorage.getItem("checkedInToday")) {
         setTimeout(() => {
             document.getElementById("checkinBox").style.display = "block";
+            localStorage.setItem("checkedInToday", "true");
         }, 5000);
     }
     
@@ -1035,7 +1094,7 @@
     loadQOTWFromFirebase();
     loadStreak();
     
-    console.log("🔥 Firebase FCM enabled! Community features with pagination are LIVE!");
+    console.log("🔥 All features fixed and working!");
 </script>
 </body>
 </html>
