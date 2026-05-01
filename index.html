@@ -391,6 +391,30 @@
         .app-installed-badge.show {
             display: block;
         }
+        .install-guide {
+            background: #E8F5E9;
+            border-radius: 28px;
+            padding: 16px;
+            margin: 10px 0;
+            text-align: center;
+            border-left: 4px solid #4CAF50;
+        }
+        .install-guide.hidden {
+            display: none;
+        }
+        .install-guide h4 {
+            color: #2E7D32;
+            margin-bottom: 10px;
+        }
+        .install-steps {
+            text-align: left;
+            margin-top: 10px;
+            font-size: 0.85rem;
+        }
+        .install-steps li {
+            margin: 8px 0;
+            margin-left: 20px;
+        }
     </style>
 </head>
 <body>
@@ -402,25 +426,34 @@
 
     <img class="hero-img" src="https://images.pexels.com/photos/1775332/pexels-photo-1775332.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Christian teens">
 
-    <!-- App already installed badge (shows if already installed) -->
+    <!-- App already installed badge -->
     <div id="appInstalledBadge" class="app-installed-badge">
         ✅ App is installed! Open from your home screen.
     </div>
 
-    <!-- VISIBLE INSTALL BUTTON - DISAPPEARS AFTER INSTALLATION -->
+    <!-- INSTALL BUTTON - IMMEDIATE ACTION -->
     <button id="installAppBtn" class="install-btn">
         📲 Install The Overflow App
     </button>
 
+    <!-- Install Guide (shows if install button doesn't work) -->
+    <div id="installGuide" class="install-guide hidden">
+        <h4>📱 How to install on iPhone/iPad:</h4>
+        <ol class="install-steps">
+            <li>Tap the <strong>Share button</strong> (square with arrow) at bottom of screen</li>
+            <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
+            <li>Tap <strong>"Add"</strong> in the top right</li>
+            <li>The app icon will appear on your home screen! 🎉</li>
+        </ol>
+        <p style="font-size: 0.75rem; margin-top: 10px; color: #666;">On Android/Chrome, just tap "Install" above!</p>
+    </div>
+
     <!-- NOTIFICATION SUBSCRIPTION BOX -->
     <div class="notification-box" id="notificationBox">
         <strong>🔔 Get Daily Bible Verses!</strong>
-        <p>Receive encouragement every morning at 8:00 AM, plus prayer alerts and challenges!</p>
+        <p>Receive encouragement every morning at 8:00 AM!</p>
         <button id="enableNotificationsBtn">✨ Enable Daily Notifications</button>
         <p id="notificationStatus" style="font-size: 0.7rem; margin-top: 8px; opacity: 0.8;"></p>
-        <div id="iosNotice" class="ios-notice" style="display: none;">
-            📱 iPhone users: Tap Share button → "Add to Home Screen" to install!
-        </div>
     </div>
 
     <!-- STREAK TRACKER -->
@@ -477,7 +510,7 @@
 
     <div class="qotw">
         <strong>❓ QUESTION OF THE WEEK</strong>
-        <p>"Where do you feel distant from God lately?"</p>
+        <p id="qotwQuestion">"Where do you feel distant from God lately?"</p>
         <textarea id="qotwAnswer" rows="2" placeholder="Anonymous answer..."></textarea>
         <button id="submitQotw">Share honestly 🙌</button>
         <div id="qotwResponses" style="margin-top: 12px;"></div>
@@ -530,7 +563,7 @@
         <div id="emotionNotesList" class="sticky-grid"></div>
     </div>
 
-    <footer>✝️ The Overflow — real faith, real teens. Tap "Install App" to add to home screen!</footer>
+    <footer>✝️ The Overflow — real faith, real teens.</footer>
 </div>
 
 <script>
@@ -553,114 +586,83 @@
     const db = firebase.firestore();
     const messaging = firebase.messaging();
     
-    // ⚠️ PROFANITY FILTER - BLOCK INAPPROPRIATE CONTENT ⚠️
+    // ========== PROFANITY FILTER ==========
     const badWords = ["fuck", "shit", "cunt", "motherfucker", "cocksucker", "piss", "tits", "dick", "prick", "bollocks", "bullshit", "horseshit", "dipshit", "jackass", "asshole", "fuckhead", "shithead", "dumbfuck", "clusterfuck", "shitshow", "nigger", "spic", "kike", "chink", "wetback", "gook", "coon", "raghead", "faggot", "dyke", "tranny", "retard", "mongoloid", "cripple", "gypsy", "penis", "vagina", "anus", "clitoris", "labia", "scrotum", "testicles", "nipples", "blowjob", "handjob", "deepthroat", "anal", "gangbang", "bukkake", "orgy", "masturbation", "porn", "hentai", "dildo", "vibrator", "milf", "bitch", "bastard", "whore", "slut", "skank", "tramp", "jezebel", "hoe", "twat", "wanker", "tosser", "knob", "moron", "idiot", "loser", "cretin", "scum", "trash"];
     
     function containsProfanity(text) {
         const lowerText = text.toLowerCase();
         for (let word of badWords) {
-            if (lowerText.includes(word)) {
-                return true;
-            }
+            if (lowerText.includes(word)) return true;
         }
         return false;
     }
-    // ⚠️ END OF PROFANITY FILTER ⚠️
     
-    // ========== PWA INSTALLATION WITH BUTTON DISAPPEARING ==========
-    let deferredPrompt;
+    // ========== PWA INSTALLATION - IMMEDIATE ==========
     const installBtn = document.getElementById('installAppBtn');
     const installedBadge = document.getElementById('appInstalledBadge');
+    const installGuide = document.getElementById('installGuide');
     
-    // Check if app is already installed (standalone mode)
-    const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || 
-                                window.navigator.standalone === true;
+    // Check if already installed (standalone mode)
+    const isInStandaloneMode = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
     
-    if (isInStandaloneMode) {
-        // App is already installed and running as standalone
+    if (isInStandaloneMode || localStorage.getItem('appInstalled') === 'true') {
         installBtn.classList.add('hidden');
         installedBadge.classList.add('show');
+        installGuide.classList.add('hidden');
     }
     
-    // Listen for beforeinstallprompt event
-    window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        
-        // Only show button if not already installed
-        if (!isInStandaloneMode) {
-            installBtn.classList.remove('hidden');
-        }
-    });
-    
-    // Handle install button click
-    installBtn.addEventListener('click', async () => {
-        if (deferredPrompt) {
-            // Show the install prompt
-            deferredPrompt.prompt();
-            
-            // Wait for user's choice
-            const { outcome } = await deferredPrompt.userChoice;
-            
-            if (outcome === 'accepted') {
-                // User installed the app - hide the button permanently
-                installBtn.classList.add('hidden');
-                installedBadge.classList.add('show');
-                showPopup('🎉 App installed! Check your home screen!');
-                burstConfetti();
-                
-                // Store that they installed
-                localStorage.setItem('appInstalled', 'true');
-            } else {
-                showPopup('You can install the app anytime from the browser menu!');
-            }
-            
-            // Clear the deferredPrompt
-            deferredPrompt = null;
-        } else {
-            // Fallback for browsers that don't support beforeinstallprompt
-            if (isIOS && isSafari) {
-                showPopup('📱 Tap the Share button → "Add to Home Screen"');
-            } else {
-                showPopup('Your browser supports app installation. Look for the install icon in the address bar!');
-            }
-        }
-    });
-    
-    // Also hide button if user previously installed (from localStorage)
-    if (localStorage.getItem('appInstalled') === 'true' && !isInStandaloneMode) {
-        installBtn.classList.add('hidden');
-        installedBadge.classList.add('show');
-    }
-    
-    // Listen for appinstalled event (some browsers fire this)
-    window.addEventListener('appinstalled', () => {
-        installBtn.classList.add('hidden');
-        installedBadge.classList.add('show');
-        localStorage.setItem('appInstalled', 'true');
-        showPopup('🎉 Thank you for installing The Overflow!');
-    });
-    
-    // iOS detection and instructions
+    // iOS detection
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
     
-    if (isIOS && isSafari) {
-        installBtn.innerHTML = '📱 Add to Home Screen (iOS)';
-        installBtn.onclick = () => {
-            showPopup('📭 Tap the Share button (square with arrow) → Scroll down → "Add to Home Screen"');
-        };
-        document.getElementById("iosNotice").style.display = "block";
-        document.getElementById("enableNotificationsBtn").disabled = true;
-        document.getElementById("enableNotificationsBtn").style.opacity = "0.5";
-        document.getElementById("enableNotificationsBtn").innerHTML = "📱 Notifications not supported on iOS Safari";
-    }
+    // For Android/Chrome - try native install prompt
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (!isInStandaloneMode && !isIOS) {
+            installBtn.classList.remove('hidden');
+            installBtn.innerHTML = '📲 Install The Overflow App';
+        }
+    });
+    
+    // Install button click handler
+    installBtn.addEventListener('click', async () => {
+        if (deferredPrompt) {
+            // Android/Chrome native install
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                installBtn.classList.add('hidden');
+                installedBadge.classList.add('show');
+                localStorage.setItem('appInstalled', 'true');
+                showPopup('🎉 App installed! Check your home screen!');
+                burstConfetti();
+            }
+            deferredPrompt = null;
+        } else if (isIOS && isSafari) {
+            // iPhone - show guide
+            installGuide.classList.remove('hidden');
+            installBtn.classList.add('hidden');
+            showPopup('📱 Tap Share → Add to Home Screen');
+        } else {
+            // Fallback for other browsers
+            installGuide.classList.remove('hidden');
+            showPopup('Click the three dots menu → "Install app" or "Add to Home screen"');
+        }
+    });
     
     // Register service worker
-    if ('serviceWorker' in navigator && !isIOS) {
+    if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/firebase-messaging-sw.js')
-            .then(reg => console.log('Service Worker registered'))
+            .then(reg => console.log('Service Worker registered:', reg))
             .catch(err => console.log('Service Worker error:', err));
+    }
+    
+    // iOS specific - show guide always for Safari
+    if (isIOS && isSafari && !isInStandaloneMode) {
+        installBtn.innerHTML = '📱 Add to Home Screen (iOS)';
+        installGuide.classList.remove('hidden');
     }
     
     // ========== REST OF YOUR EXISTING CODE ==========
@@ -727,10 +729,6 @@
     }
     
     async function subscribeToNotifications() {
-        if (isIOS && isSafari) {
-            showPopup("📱 iPhone Safari doesn't support push notifications.");
-            return;
-        }
         try {
             const permission = await Notification.requestPermission();
             if (permission === 'granted') {
@@ -825,14 +823,11 @@
         return str.replace(/[&<>]/g, function(m){ return m==='&' ? '&amp;' : m==='<' ? '&lt;' : '&gt;'; }); 
     }
     
-    // UPDATED addPrayerToFirebase WITH PROFANITY FILTER
     async function addPrayerToFirebase(text, name = "Anonymous") {
-        // PROFANITY CHECK - Block inappropriate content
         if (containsProfanity(text)) {
-            showPopup("🙏 Please keep prayers respectful and encouraging. Everyone is welcome here!");
+            showPopup("🙏 Please keep prayers respectful. Everyone is welcome here!");
             return false;
         }
-        
         try {
             await db.collection("prayers").add({
                 name: name,
@@ -846,20 +841,16 @@
             burstConfetti();
             return true;
         } catch (error) {
-            console.error("Error adding prayer:", error);
             showPopup("Error: " + error.message);
             return false;
         }
     }
     
-    // UPDATED addQOTWToFirebase WITH PROFANITY FILTER
     async function addQOTWToFirebase(answer) {
-        // PROFANITY CHECK - Block inappropriate QOTW answers
         if (containsProfanity(answer)) {
-            showPopup("🙏 Please keep answers respectful and encouraging.");
+            showPopup("🙏 Please keep answers respectful.");
             return false;
         }
-        
         try {
             await db.collection("qotw_answers").add({
                 answer: answer,
@@ -869,7 +860,6 @@
             burstConfetti();
             return true;
         } catch (error) {
-            console.error("Error adding answer:", error);
             showPopup("Error: " + error.message);
             return false;
         }
@@ -968,6 +958,7 @@
         renderStickyNotes();
     }
     
+    // Event Listeners
     document.getElementById("enableNotificationsBtn").addEventListener("click", subscribeToNotifications);
     document.getElementById("clearSavedBtn").addEventListener("click", () => {
         savedNotes = [];
@@ -1090,7 +1081,7 @@
     loadPrayersFromFirebase();
     loadQOTWFromFirebase();
     
-    console.log("🔥 PWA Ready! Profanity filter active!");
+    console.log("🔥 App ready! Teens can install immediately!");
 </script>
 </body>
 </html>
