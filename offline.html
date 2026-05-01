@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Overflow - Offline</title>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            margin: 0;
+        }
+        .offline-card {
+            background: white;
+            border-radius: 32px;
+            padding: 40px 30px;
+            text-align: center;
+            max-width: 400px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+        }
+        h1 { color: #E76F51; margin-bottom: 10px; }
+        p { color: #666; margin-bottom: 20px; line-height: 1.6; }
+        button {
+            background: #E76F51;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover { background: #D45A3A; }
+    </style>
+</head>
+<body>
+    <div class="offline-card">
+        <h1>✝️ THE OVERFLOW</h1>
+        <p>You're offline right now.<br>Check your internet connection and try again.</p>
+        <button onclick="location.reload()">⟳ Try Again</button>
+        <p style="font-size: 12px; margin-top: 20px;">God is with you even offline! 🙏</p>
+    </div>
+</body>
+</html>
