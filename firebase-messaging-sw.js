@@ -1,8 +1,6 @@
-// firebase-messaging-sw.js - Place this file in the root of your website
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
 
-// Your Firebase config (SAME as your main site)
 const firebaseConfig = {
     apiKey: "AIzaSyDvRhyUOOzp3eF5GOeu_cG6n39CzcwfaEY",
     authDomain: "overflow1-0.firebaseapp.com",
@@ -15,41 +13,41 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// Handle background messages
-messaging.onBackgroundMessage((payload) => {
-    console.log('Background message received:', payload);
-    
-    const notificationTitle = payload.notification?.title || '✝️ THE OVERFLOW';
-    const notificationOptions = {
-        body: payload.notification?.body || 'Tap to read your daily encouragement',
-        icon: 'https://your-github-pages-url/icon.png',
-        badge: 'https://your-github-pages-url/badge.png',
-        vibrate: [200, 100, 200],
-        data: {
-            click_action: payload.fcmOptions?.link || payload.data?.link || 'https://your-github-pages-url/'
-        }
-    };
-    
-    self.registration.showNotification(notificationTitle, notificationOptions);
+const CACHE_NAME = 'the-overflow-v1';
+const urlsToCache = ['/', '/index.html', '/offline.html', '/manifest.json', '/icon.svg'];
+
+self.addEventListener('install', (event) => {
+    event.waitUntil(
+        caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
+    );
+    self.skipWaiting();
 });
 
-// Handle notification click
+self.addEventListener('fetch', (event) => {
+    event.respondWith(
+        caches.match(event.request).then((response) => {
+            return response || fetch(event.request).catch(() => {
+                if (event.request.mode === 'navigate') {
+                    return caches.match('/offline.html');
+                }
+                return new Response('Offline');
+            });
+        })
+    );
+});
+
+messaging.onBackgroundMessage((payload) => {
+    self.registration.showNotification(
+        payload.notification?.title || '✝️ THE OVERFLOW',
+        {
+            body: payload.notification?.body || 'Tap for your daily encouragement',
+            icon: '/icon.svg',
+            badge: '/icon.svg'
+        }
+    );
+});
+
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    
-    let clickUrl = event.notification.data?.click_action || 'https://your-github-pages-url/';
-    
-    event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true })
-            .then((clientList) => {
-                for (const client of clientList) {
-                    if (client.url === clickUrl && 'focus' in client) {
-                        return client.focus();
-                    }
-                }
-                if (clients.openWindow) {
-                    return clients.openWindow(clickUrl);
-                }
-            })
-    );
+    event.waitUntil(clients.openWindow('/'));
 });
