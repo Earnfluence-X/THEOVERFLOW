@@ -553,6 +553,20 @@
     const db = firebase.firestore();
     const messaging = firebase.messaging();
     
+    // ⚠️ PROFANITY FILTER - BLOCK INAPPROPRIATE CONTENT ⚠️
+    const badWords = ["fuck", "shit", "cunt", "motherfucker", "cocksucker", "piss", "tits", "dick", "prick", "bollocks", "bullshit", "horseshit", "dipshit", "jackass", "asshole", "fuckhead", "shithead", "dumbfuck", "clusterfuck", "shitshow", "nigger", "spic", "kike", "chink", "wetback", "gook", "coon", "raghead", "faggot", "dyke", "tranny", "retard", "mongoloid", "cripple", "gypsy", "penis", "vagina", "anus", "clitoris", "labia", "scrotum", "testicles", "nipples", "blowjob", "handjob", "deepthroat", "anal", "gangbang", "bukkake", "orgy", "masturbation", "porn", "hentai", "dildo", "vibrator", "milf", "bitch", "bastard", "whore", "slut", "skank", "tramp", "jezebel", "hoe", "twat", "wanker", "tosser", "knob", "moron", "idiot", "loser", "cretin", "scum", "trash"];
+    
+    function containsProfanity(text) {
+        const lowerText = text.toLowerCase();
+        for (let word of badWords) {
+            if (lowerText.includes(word)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    // ⚠️ END OF PROFANITY FILTER ⚠️
+    
     // ========== PWA INSTALLATION WITH BUTTON DISAPPEARING ==========
     let deferredPrompt;
     const installBtn = document.getElementById('installAppBtn');
@@ -649,7 +663,7 @@
             .catch(err => console.log('Service Worker error:', err));
     }
     
-    // ========== REST OF YOUR EXISTING CODE (keep your working functions) ==========
+    // ========== REST OF YOUR EXISTING CODE ==========
     let allPrayers = [];
     let displayedPrayerCount = 10;
     let allQotwAnswers = [];
@@ -811,20 +825,54 @@
         return str.replace(/[&<>]/g, function(m){ return m==='&' ? '&amp;' : m==='<' ? '&lt;' : '&gt;'; }); 
     }
     
+    // UPDATED addPrayerToFirebase WITH PROFANITY FILTER
     async function addPrayerToFirebase(text, name = "Anonymous") {
+        // PROFANITY CHECK - Block inappropriate content
+        if (containsProfanity(text)) {
+            showPopup("🙏 Please keep prayers respectful and encouraging. Everyone is welcome here!");
+            return false;
+        }
+        
         try {
-            await db.collection("prayers").add({ name, text, pray: 0, heart: 0, same: 0, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+            await db.collection("prayers").add({
+                name: name,
+                text: text,
+                pray: 0,
+                heart: 0,
+                same: 0,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
             showPopup("Your prayer was shared! 🙏");
             burstConfetti();
-        } catch(e) { showPopup("Error: " + e.message); }
+            return true;
+        } catch (error) {
+            console.error("Error adding prayer:", error);
+            showPopup("Error: " + error.message);
+            return false;
+        }
     }
     
+    // UPDATED addQOTWToFirebase WITH PROFANITY FILTER
     async function addQOTWToFirebase(answer) {
+        // PROFANITY CHECK - Block inappropriate QOTW answers
+        if (containsProfanity(answer)) {
+            showPopup("🙏 Please keep answers respectful and encouraging.");
+            return false;
+        }
+        
         try {
-            await db.collection("qotw_answers").add({ answer, timestamp: firebase.firestore.FieldValue.serverTimestamp() });
+            await db.collection("qotw_answers").add({
+                answer: answer,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
             showPopup("Thanks for sharing! 💛");
             burstConfetti();
-        } catch(e) { showPopup("Error: " + e.message); }
+            return true;
+        } catch (error) {
+            console.error("Error adding answer:", error);
+            showPopup("Error: " + error.message);
+            return false;
+        }
     }
     
     document.getElementById("generateArtBtn").addEventListener("click", async () => {
@@ -1042,7 +1090,7 @@
     loadPrayersFromFirebase();
     loadQOTWFromFirebase();
     
-    console.log("🔥 PWA Ready! Install button disappears after installation!");
+    console.log("🔥 PWA Ready! Profanity filter active!");
 </script>
 </body>
 </html>
